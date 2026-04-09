@@ -347,7 +347,7 @@ on failure. The exit code plus stderr JSON provides the error signal.
 | `--wait-on-rate-limit` | bool | false | Opt-in: sleep and retry when rate limited instead of exiting |
 | `--max-results` | int | 10000 | Hard cap on total results when using `--all` to prevent unbounded memory growth |
 
-### 6. Override System (`internal/override/`)
+### 7. Override System (`internal/override/`)
 
 For commands that need richer UX than the generic dispatcher:
 
