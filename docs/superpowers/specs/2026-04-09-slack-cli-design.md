@@ -205,30 +205,55 @@ func FormatOutput(data interface{}, pretty bool) error {
 
 ```go
 func ExecuteWithPagination(
+    ctx context.Context,
     client *slack.Client,
     method registry.MethodDef,
     flags map[string]interface{},
     fetchAll bool,
     limit int,
+    maxResults int, // hard cap from --max-results (default 10000)
 ) (interface{}, error) {
     if !fetchAll {
-        return Execute(client, method, flags)
+        return Execute(ctx, client, method, flags)
+    }
+    
+    // Apply hard cap: effective limit is min(limit, maxResults) when both are set,
+    // or maxResults when limit is 0 (unlimited).
+    effectiveLimit := maxResults
+    if limit > 0 && limit < maxResults {
+        effectiveLimit = limit
     }
     
     var allResults []interface{}
     cursor := ""
     for {
+        // Check for cancellation (SIGINT/SIGTERM) between pages
+        select {
+        case <-ctx.Done():
+            // Return partial results collected so far with resumption cursor
+            return partialResponse(allResults, cursor, ctx.Err()), nil
+        default:
+        }
+        
         flags[method.CursorParam] = cursor
-        result, err := Execute(client, method, flags)
+        result, err := Execute(ctx, client, method, flags)
         if err != nil {
+            // On rate limit during pagination without --wait-on-rate-limit,
+            // return partial results + cursor for resumption
+            if isRateLimitError(err) {
+                return partialResponse(allResults, cursor, err), nil
+            }
             return nil, err
         }
         items := extractSlice(result, method.ResponseKey)
         allResults = append(allResults, items...)
         cursor = extractCursor(result, method.CursorResponse)
-        if cursor == "" || (limit > 0 && len(allResults) >= limit) {
+        if cursor == "" || len(allResults) >= effectiveLimit {
             break
         }
+    }
+    if len(allResults) > effectiveLimit {
+        allResults = allResults[:effectiveLimit]
     }
     return allResults, nil
 }
