@@ -369,6 +369,10 @@ Overrides are registered via `init()` functions. The builder checks the override
 package main
 
 func main() {
+    // Signal handling: cancellable context for graceful shutdown (12-factor IX: Disposability)
+    ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    defer cancel()
+    
     root := &cobra.Command{
         Use:   "slack-cli",
         Short: "Slack Web API CLI",
