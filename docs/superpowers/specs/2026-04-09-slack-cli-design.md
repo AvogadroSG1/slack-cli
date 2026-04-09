@@ -39,6 +39,7 @@ graph TD
     L[generate/introspect.go] -->|go generate| C
     
     M[errors/errors.go] --> F
+    N[validate/validate.go] --> F
 ```
 
 ### Flow
