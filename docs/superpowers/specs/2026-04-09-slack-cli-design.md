@@ -68,6 +68,8 @@ slack-cli/
 │   │   └── pagination.go        # --all / --cursor / --limit handling
 │   ├── override/
 │   │   └── override.go          # Override registry + hand-crafted commands
+│   ├── validate/
+│   │   └── validate.go          # Input validation (IDs, paths, JSON, limits)
 │   └── errors/
 │       └── errors.go            # Exit code mapping
 ├── generate/
