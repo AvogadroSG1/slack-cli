@@ -313,8 +313,19 @@ func main() {
     root.PersistentFlags().Duration("timeout", 30*time.Second, "Request timeout")
     root.PersistentFlags().Bool("debug", false, "Debug HTTP traffic to stderr")
     
-    // Auth check
+    // Auth: env var (primary), stdin pipe (secondary), --token flag (warn + accept)
     token := os.Getenv("SLACK_TOKEN")
+    if token == "" && !terminal.IsTerminal(int(os.Stdin.Fd())) {
+        // Read token from stdin pipe (e.g., `vault read -field=token | slack-cli ...`)
+        tokenBytes, _ := io.ReadAll(io.LimitReader(os.Stdin, 256))
+        token = strings.TrimSpace(string(tokenBytes))
+    }
+    // SECURITY: If --token flag was used, emit a warning to stderr because
+    // CLI flags are visible in the OS process table (ps aux) and shell history.
+    if tokenFromFlag != "" {
+        fmt.Fprintln(os.Stderr, "WARNING: passing tokens via --token flag exposes them in the process table and shell history. Use SLACK_TOKEN env var or stdin pipe instead.")
+        token = tokenFromFlag
+    }
     if token == "" {
         // Deferred: only fail when a command actually needs the client
     }
