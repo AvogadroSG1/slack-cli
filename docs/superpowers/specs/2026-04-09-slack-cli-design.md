@@ -275,7 +275,10 @@ Error output format (always JSON to stdout):
 | `--limit` | int | 0 | Max total results when using `--all` (0 = unlimited) |
 | `--cursor` | string | "" | Manual pagination cursor |
 | `--timeout` | duration | 30s | Request timeout |
-| `--debug` | bool | false | Print HTTP request/response details to stderr |
+| `--debug` | bool | false | Print HTTP request/response details to stderr (tokens redacted) |
+| `--token` | string | "" | Slack API token (WARNING: visible in process table; prefer `SLACK_TOKEN` env var or stdin pipe) |
+| `--wait-on-rate-limit` | bool | false | Opt-in: sleep and retry when rate limited instead of exiting |
+| `--max-results` | int | 10000 | Hard cap on total results when using `--all` to prevent unbounded memory growth |
 
 ### 6. Override System (`internal/override/`)
 
