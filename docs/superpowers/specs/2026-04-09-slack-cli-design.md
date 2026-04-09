@@ -352,7 +352,9 @@ type MethodDef struct {
     Category    string // Subcommand group (e.g., "chat")
     Command     string // Subcommand action (e.g., "post-message")
     
-    // SDK mapping
+    // SDK mapping (documentation only; dispatch uses generated functions, not reflection)
+    // [REVIEW #9] This field is no longer used for runtime dispatch. Retained as
+    // documentation metadata so the registry is self-describing.
     SDKMethod   string // Go method name on *slack.Client (e.g., "PostMessageContext")
     
     // CLI metadata
