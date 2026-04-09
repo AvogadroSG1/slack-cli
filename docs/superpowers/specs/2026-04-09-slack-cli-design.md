@@ -234,7 +234,38 @@ func ExecuteWithPagination(
 }
 ```
 
-### 4. Error Handling (`internal/errors/`)
+### 4. Input Validation (`internal/validate/`)
+
+The CLI MUST validate flag values **before** making any API call to provide fast, clear feedback and avoid wasting rate limit budget on malformed requests.
+
+**Validation rules:**
+
+| Validation | Rule | Rationale |
+|---|---|---|
+| Required params | Enforced at CLI level via Cobra `MarkFlagRequired` | Fail fast with `ExitInputError` (3) before any network call |
+| Channel IDs | MUST match `^[CDG][A-Z0-9]{8,}$` regex | Catches typos, prevents sending plaintext channel names where IDs are expected |
+| User IDs | MUST match `^[UWB][A-Z0-9]{8,}$` regex | Same rationale |
+| Timestamp values | MUST match `^\d{10}\.\d{6}$` format | Slack message timestamps have a specific format |
+| `--limit` | MUST be > 0 when specified with `--all` | Zero limit with `--all` now capped by `--max-results` default |
+| `--timeout` | MUST be > 0 and <= 5m | Prevents indefinite hangs and unreasonable waits |
+| `--json` typed params | MUST be valid JSON, validated with `json.Valid()` | Catches malformed JSON before API call |
+| `--file` paths | MUST pass file existence check, MUST NOT be a directory, MUST resolve symlinks and verify the resolved path is within allowed scope | See File Upload Security section |
+
+**Validation is additive**: the API will still reject invalid values that pass local validation (e.g., a well-formatted channel ID that does not exist). The goal is to catch obvious mistakes locally.
+
+```go
+package validate
+
+// ValidateChannelID returns an error if the value does not look like a Slack channel ID.
+func ValidateChannelID(value string) error {
+    if !channelIDRegex.MatchString(value) {
+        return fmt.Errorf("invalid channel ID %q: expected format C/D/G followed by alphanumeric (e.g., C01ABC23DEF)", value)
+    }
+    return nil
+}
+```
+
+### 5. Error Handling (`internal/errors/`)
 
 ```go
 package errors
