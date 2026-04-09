@@ -287,7 +287,12 @@ Error classification inspects the error chain using `errors.As`:
 - `slack.StatusCodeError` -> ExitNetError
 - Other errors -> ExitNetError
 
-Error output format (always JSON to stdout):
+Error output format (always JSON to **stderr**, never stdout):
+
+Errors MUST be written to stderr, not stdout. Writing errors to stdout mixes error data with
+successful response data, breaking pipelines like `slack-cli conversations list | jq '.channels[]'`.
+Agents parsing stdout can rely on it containing only valid response JSON on success, or being empty
+on failure. The exit code plus stderr JSON provides the error signal.
 
 ```json
 {
