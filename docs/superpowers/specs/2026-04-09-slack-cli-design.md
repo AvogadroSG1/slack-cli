@@ -43,7 +43,7 @@ graph TD
 
 ### Flow
 
-1. `main.go` initializes the root Cobra command with global flags (`--pretty`, `--all`, `--limit`, `--cursor`)
+1. `main.go` sets up signal handling (`SIGINT`/`SIGTERM` -> cancellable context), then initializes the root Cobra command with global flags (`--pretty`, `--all`, `--limit`, `--cursor`, `--timeout`, `--debug`, `--token`, `--wait-on-rate-limit`, `--max-results`)
 2. `dispatch/builder.go` reads the method registry and dynamically builds the Cobra command tree at startup
 3. Override commands (if any) replace registry entries for specific methods
 4. When a command executes, `dispatch/executor.go` maps CLI flags to SDK method parameters and calls the appropriate `slack-go/slack` method via reflection
