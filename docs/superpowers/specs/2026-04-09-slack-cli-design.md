@@ -921,11 +921,53 @@ Available Commands:
 
 ## Testing Strategy
 
-1. **Generator tests**: Verify AST parsing produces correct `MethodDef` entries for known SDK methods
-2. **Dispatcher tests**: Unit test `builder.go`, `executor.go`, `output.go`, `pagination.go` with mock registry entries
-3. **Integration tests**: Test real SDK calls against Slack API (requires token, run in CI with secrets)
+`[REVIEW #5]` Testing MUST use stdlib `testing` package with `github.com/google/go-cmp/cmp` for deep comparisons. Per project Go guidelines, assertion libraries (testify, gomega, etc.) MUST NOT be used as they fragment developer experience and obscure failure messages. Tests MUST follow table-driven patterns with `t.Run` subtests.
+
+1. **Generator tests**: Verify type-checked introspection produces correct `MethodDef` entries for known SDK methods. Use table-driven tests with golden files (expected `generated.go` output checked into `testdata/`). Use `go-cmp` for diffing.
+
+2. **Dispatch tests**: Table-driven tests for generated dispatch functions. Mock the Slack API at the HTTP level using `httptest.Server`, not by mocking Go interfaces. The `slack.New` constructor accepts `slack.OptionAPIURL` for pointing at a test server:
+
+```go
+func TestDispatchConversationsList(t *testing.T) {
+    tests := []struct {
+        name     string
+        flags    map[string]any
+        response string
+        want     any
+        wantErr  bool
+    }{
+        {
+            name:     "basic list",
+            flags:    map[string]any{"limit": 10},
+            response: `{"ok":true,"channels":[{"id":"C123","name":"general"}]}`,
+            want:     map[string]any{"channels": []slack.Channel{{/*...*/}}, "next_cursor": ""},
+        },
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+                fmt.Fprint(w, tt.response)
+            }))
+            t.Cleanup(srv.Close)
+            client := slack.New("xoxb-test", slack.OptionAPIURL(srv.URL+"/"))
+            got, err := dispatchConversationsList(context.Background(), client, tt.flags)
+            if (err != nil) != tt.wantErr {
+                t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+            }
+            if diff := cmp.Diff(tt.want, got); diff != "" {
+                t.Errorf("mismatch (-want +got):\n%s", diff)
+            }
+        })
+    }
+}
+```
+
+3. **Integration tests**: Test real SDK calls against Slack API (requires token, run in CI with secrets). Use build tag `//go:build integration` to exclude from default `go test`.
 4. **Override tests**: Verify overrides replace generated commands correctly
-5. **E2E tests**: Build binary, invoke commands, verify JSON output structure and exit codes
+5. **E2E tests**: Build binary, invoke commands via `os/exec`, verify JSON output structure and exit codes. Verify errors go to stderr and data goes to stdout.
+6. **Output tests**: Validate JSON output against golden files with `go-cmp`. Validate streaming JSON Lines output for `--all` mode.
+7. **Context cancellation tests**: Verify cancelled contexts cause clean shutdown during pagination.
+8. **Validation tests**: Table-driven tests for each validation function in `internal/validate/`.
 
 ## Special Cases
 
