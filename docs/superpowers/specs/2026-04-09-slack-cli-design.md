@@ -638,8 +638,11 @@ slack-cli conversations list
 # List ALL channels with pretty output
 slack-cli conversations list --all --pretty
 
-# Post a message
+# Post a message (full form)
 slack-cli chat post-message --channel C123ABC --text "Hello from CLI"
+
+# Post a message (ergonomic alias)
+slack-cli chat send --channel C123ABC --text "Hello from CLI"
 
 # Get user info
 slack-cli users info --user U123ABC
@@ -658,6 +661,121 @@ slack-cli conversations info --channel C123ABC --debug
 
 # Manual pagination
 slack-cli conversations list --limit 5 --cursor "dXNlcjpVMDYx..."
+
+# Shell completion setup
+eval "$(slack-cli completion zsh)"
+
+# Version info
+slack-cli version
+
+# Discover available API categories
+slack-cli --help
+
+# Discover commands within a category
+slack-cli chat --help
+
+# List all available API methods
+slack-cli api list
+slack-cli api list --category chat
+```
+
+## Help Text Quality
+
+The `slack-go/slack` SDK has minimal documentation on most methods -- typically just "For more details, see XContext documentation" or a reference to the Slack API docs URL. The generator MUST produce useful help text despite this.
+
+**Help text sourcing strategy (in priority order):**
+
+1. **Slack API doc URL**: Every `MethodDef` MUST include the Slack API docs URL (e.g., `https://api.slack.com/methods/chat.postMessage`). The generator extracts these from SDK doc comments where available (pattern: `// Slack API docs: https://...`).
+2. **Generated description from API method name**: Convert the API method to a human sentence: `chat.postMessage` -> "Post a message to a channel (Slack API: chat.postMessage)".
+3. **Supplementary descriptions file**: A hand-maintained `generate/descriptions.yaml` file that maps API methods to better descriptions. The generator merges these into the registry.
+4. **Flag descriptions**: For struct parameters, use the Go struct field's `json` tag name and type. For `MsgOption` parameters, use the `MsgOption` function's doc comment.
+
+**Example generated help output:**
+
+```
+$ slack-cli chat post-message --help
+Post a message to a channel
+
+Slack API: chat.postMessage
+Docs:     https://api.slack.com/methods/chat.postMessage
+Aliases:  send
+
+Usage:
+  slack-cli chat post-message [flags]
+
+Required Flags:
+  --channel string     Channel ID to post to (e.g., C01ABC23DEF)
+  --text string        Message text (supports Slack mrkdwn formatting)
+
+Optional Flags:
+  --thread-ts string   Thread timestamp to reply to
+  --reply-broadcast    Also post to the channel when replying in a thread
+  --unfurl-links       Enable URL unfurling in the message
+  --blocks string      Block Kit blocks as JSON array
+  --icon-emoji string  Emoji to use as the message icon (e.g., :robot_face:)
+
+Global Flags:
+  --pretty             Human-readable output
+  --debug              Debug HTTP traffic to stderr
+  --timeout duration   Request timeout (default 30s)
+```
+
+## Discoverability
+
+Users MUST be able to find available commands without reading external documentation.
+
+**Built-in discovery commands:**
+
+1. `slack-cli --help` -- Lists all API categories (chat, conversations, files, users, etc.) with short descriptions
+2. `slack-cli <category> --help` -- Lists all commands within a category
+3. `slack-cli <category> <command> --help` -- Shows full usage, flags, and Slack API docs URL
+4. `slack-cli api list` -- Lists all available API methods in a machine-readable format:
+
+```bash
+$ slack-cli api list
+chat.delete
+chat.getPermalink
+chat.postEphemeral
+chat.postMessage
+chat.scheduledMessages.list
+chat.scheduleMessage
+chat.update
+conversations.archive
+conversations.close
+...
+
+$ slack-cli api list --category chat --pretty
+COMMAND                  API METHOD                    DESCRIPTION
+chat delete              chat.delete                   Delete a message
+chat get-permalink       chat.getPermalink             Get a permalink for a message
+chat post-message        chat.postMessage              Post a message to a channel
+chat schedule-message    chat.scheduleMessage          Schedule a message
+chat update              chat.update                   Update a message
+```
+
+5. `slack-cli api list --category chat` -- Filter by category
+6. `slack-cli api list --json` -- Output as JSON array (useful for agents building dynamic tool lists)
+
+The `api list` command is a built-in override (not generated from the SDK) that reads the registry at runtime.
+
+**Category help text:**
+
+Each category group command (e.g., `slack-cli chat`) MUST have a useful `Short` description and a `Long` description that lists the most common commands in that category. The generator produces these from the method count and common actions:
+
+```
+$ slack-cli chat --help
+Slack Chat API methods (12 commands)
+
+Send, update, delete, and schedule messages in channels and threads.
+
+Available Commands:
+  delete              Delete a message
+  get-permalink       Get a permalink for a message
+  post-ephemeral      Post an ephemeral message visible only to one user
+  post-message        Post a message to a channel (alias: send)
+  schedule-message    Schedule a message for later delivery
+  update              Update an existing message
+  ...
 ```
 
 ## Testing Strategy
