@@ -363,7 +363,7 @@ func Register(apiMethod string, cmd *cobra.Command) {
 
 Overrides are registered via `init()` functions. The builder checks the override map before creating a generic command for each method.
 
-### 7. Entry Point (`cmd/slack-cli/main.go`)
+### 8. Entry Point (`cmd/slack-cli/main.go`)
 
 ```go
 package main
