@@ -543,6 +543,8 @@ func FormatOutput(w io.Writer, data any, pretty bool) error {
 
 #### pagination.go
 
+`[REVIEW #7]` For `--all` mode, results SHOULD be streamed per-page via `json.Encoder` instead of accumulated in memory. A Slack workspace with 50,000 members returning `users.list --all` would accumulate ~100MB of heap before any output. Streaming each page immediately bounds memory to a single page (~400KB). The streamed output format is JSON Lines (one object per line), natively supported by `jq --slurp`.
+
 ```go
 func ExecuteWithPagination(
     ctx context.Context,
