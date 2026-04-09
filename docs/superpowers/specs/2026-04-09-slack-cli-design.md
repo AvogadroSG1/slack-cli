@@ -333,7 +333,7 @@ on failure. The exit code plus stderr JSON provides the error signal.
 }
 ```
 
-### 5. Global Flags
+### 6. Global Flags
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
