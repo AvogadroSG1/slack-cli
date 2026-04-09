@@ -451,27 +451,80 @@ func BuildCommands(root *cobra.Command, reg []registry.MethodDef, overrides map[
 
 #### executor.go
 
-Executes SDK calls via reflection:
+`[REVIEW #1]` Executes SDK calls via generated type-safe dispatch functions (no reflection).
+
+**Why not reflection:** Runtime reflection (`reflect.Value.Call`) in Go has several problems for this use case:
+
+1. **No compile-time safety.** If the SDK changes a method signature, reflection code compiles fine and panics at runtime. Generated dispatch functions fail at compile time.
+2. **Performance.** `reflect.Value.Call` allocates `[]reflect.Value` on every call. For a single-call CLI the absolute cost is negligible, but the philosophical issue is stronger: Go's type system exists to catch errors at compile time, and reflection deliberately bypasses it.
+3. **Complexity.** Reflection code for struct population is fragile: field ordering, unexported fields, pointer receivers, variadic arguments, and `MsgOption` functional option patterns all require special handling. Generated code handles each method's specific signature directly.
+4. **Debuggability.** Stack traces through reflected calls show `reflect.Value.Call` instead of the actual method name.
+
+The generated dispatch file contains a function per SDK method and a lookup map:
 
 ```go
-func Execute(ctx context.Context, client *slack.Client, method registry.MethodDef, flags map[string]interface{}) (interface{}, error) {
-    // 1. Validate all required flags are present and pass format validation
-    // 2. Apply per-request timeout: wrap ctx with method.DefaultTimeout or global --timeout
-    //    timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
-    //    defer cancel()
-    // 3. Route based on method.CallStyle:
-    //    - "positional": pass simple params in order after ctx
-    //    - "struct": create struct via reflection, populate fields from flags
-    //    - "msgoption": extract channelID, build []MsgOption from option builder map
-    //    - "custom-option": similar to msgoption but with method-specific option type
-    // 4. Look up the method on *slack.Client by SDKMethod name
-    // 5. Call the method via reflection with constructed arguments
-    // 6. Extract return values, separate data from error
-    // 7. Return the data for output formatting
+// generated_dispatch.go (auto-generated, do not edit)
+package dispatch
+
+// DispatchFunc is the signature for all generated dispatch functions.
+type DispatchFunc func(ctx context.Context, client *slack.Client, flags map[string]any) (any, error)
+
+// Dispatch maps API method names to their type-safe dispatch functions.
+var Dispatch = map[string]DispatchFunc{
+    "chat.postMessage":   dispatchChatPostMessage,
+    "conversations.list": dispatchConversationsList,
+    // ... ~166 entries
+}
+
+func dispatchChatPostMessage(ctx context.Context, client *slack.Client, flags map[string]any) (any, error) {
+    channelID, _ := flags["channel"].(string)
+    var opts []slack.MsgOption
+    if text, ok := flags["text"].(string); ok {
+        opts = append(opts, slack.MsgOptionText(text, false))
+    }
+    if threadTS, ok := flags["thread-ts"].(string); ok {
+        opts = append(opts, slack.MsgOptionTS(threadTS))
+    }
+    _, timestamp, err := client.PostMessageContext(ctx, channelID, opts...)
+    if err != nil {
+        return nil, err
+    }
+    return map[string]string{"channel": channelID, "ts": timestamp}, nil
+}
+
+func dispatchConversationsList(ctx context.Context, client *slack.Client, flags map[string]any) (any, error) {
+    params := &slack.GetConversationsParameters{}
+    if cursor, ok := flags["cursor"].(string); ok {
+        params.Cursor = cursor
+    }
+    if limit, ok := flags["limit"].(int); ok {
+        params.Limit = limit
+    }
+    channels, nextCursor, err := client.GetConversationsContext(ctx, params)
+    if err != nil {
+        return nil, err
+    }
+    return map[string]any{
+        "channels":    channels,
+        "next_cursor": nextCursor,
+    }, nil
 }
 ```
 
-The `CallStyle` field in `MethodDef` determines how flags are mapped to SDK method arguments. This is the critical design point: the executor is not one-size-fits-all. See the MsgOption Handling Strategy section for details on the `"msgoption"` call style.
+The executor becomes a thin lookup:
+
+```go
+// executor.go
+func Execute(ctx context.Context, client *slack.Client, apiMethod string, flags map[string]any) (any, error) {
+    fn, ok := Dispatch[apiMethod]
+    if !ok {
+        return nil, fmt.Errorf("unknown API method: %s", apiMethod)
+    }
+    return fn(ctx, client, flags)
+}
+```
+
+The `CallStyle` field in `MethodDef` is used by the **generator** (not the executor) to determine what shape of dispatch function to emit. See the MsgOption Handling Strategy section for details on the `"msgoption"` call style.
 
 #### output.go
 
