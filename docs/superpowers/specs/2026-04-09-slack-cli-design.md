@@ -344,8 +344,13 @@ A `go generate` tool that:
    - Extracts the method name, maps to API method name (e.g., `PostMessageContext` -> `chat.postMessage`)
    - Inspects parameter types: simple params become individual `ParamDef` entries; struct params are expanded field-by-field
    - Detects pagination by looking for `Cursor` fields in param structs and `NextCursor` in response types
-   - Skips methods starting with `Admin` (per scope exclusion)
+   - Skips methods whose extracted API endpoint starts with `admin.` (per scope exclusion)
+   - Also skips `ConnectRTM`, `StartRTM`, `StartSocketMode` (persistent connection methods, not request-response)
 5. Emits `internal/registry/generated.go` containing the populated `Registry` slice
+
+**Important: legacy admin methods in `admin.go`**
+
+The SDK file `admin.go` contains methods like `DisableUser`, `InviteGuest`, `SetRegular`, `SetRestricted` that are NOT `admin.*` API methods. They are legacy undocumented Slack admin endpoints. The generator's skip logic MUST be based on the extracted API endpoint string (starts with `"admin."`), not the Go source file name or method name prefix. These legacy methods SHOULD be included in the CLI if they have extractable API endpoints, or added to the supplementary mapping table if not.
 
 **Method name to API method mapping:**
 
