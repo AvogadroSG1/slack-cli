@@ -503,6 +503,8 @@ func ValidateChannelID(value string) error {
 
 ### 5. Error Handling (`internal/errors/`)
 
+> **Note:** Section numbering corrected from duplicate "5" in earlier draft.
+
 ```go
 package errors
 
