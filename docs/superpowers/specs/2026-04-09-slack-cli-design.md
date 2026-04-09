@@ -317,6 +317,8 @@ type MethodDef struct {
     
     // CLI metadata
     Description string
+    DocsURL     string // Slack API docs URL (e.g., "https://api.slack.com/methods/chat.postMessage")
+    Aliases     []string // Ergonomic command aliases (e.g., ["send"] for post-message)
     Params      []ParamDef
     
     // Pagination
