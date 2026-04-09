@@ -576,6 +576,8 @@ Overrides are registered via `init()` functions. The builder checks the override
 
 ### 8. Entry Point (`cmd/slack-cli/main.go`)
 
+> **Note:** Original spec had duplicate section 7 numbers. Fixed to sequential 7/8.
+
 ```go
 package main
 
