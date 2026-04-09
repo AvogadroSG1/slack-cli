@@ -136,7 +136,7 @@ graph TD
 slack-cli/
 ├── cmd/
 │   └── slack-cli/
-│       └── main.go              # Entry point, root Cobra command
+│       └── main.go              # Entry point, root Cobra command, version info
 ├── internal/
 │   ├── registry/
 │   │   ├── method.go            # MethodDef struct, registry types
@@ -144,6 +144,7 @@ slack-cli/
 │   ├── dispatch/
 │   │   ├── builder.go           # Builds Cobra tree from registry
 │   │   ├── executor.go          # Calls slack-go methods via reflection
+│   │   ├── options.go           # MsgOption builder maps (chat, usergroup, etc.)
 │   │   ├── output.go            # JSON default / --pretty formatting
 │   │   └── pagination.go        # --all / --cursor / --limit handling
 │   ├── override/
@@ -155,10 +156,133 @@ slack-cli/
 ├── generate/
 │   ├── introspect.go            # AST parser for slack-go/slack
 │   └── templates.go             # Go templates for generated code
-├── go.mod
+├── go.mod                       # module github.com/poconnor/slack-cli
 ├── go.sum
-├── Makefile
+├── Makefile                     # See Makefile Targets section
+├── CLAUDE.md                    # AI agent developer instructions
+├── README.md                    # See README section
 └── docs/
+```
+
+### Makefile Targets
+
+```makefile
+MODULE   := github.com/poconnor/slack-cli
+VERSION  := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT   := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+DATE     := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS  := -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)"
+
+.PHONY: generate build test lint install clean
+
+generate:          ## Run go generate to rebuild registry from SDK source
+	go generate ./generate/...
+
+build: generate    ## Build the slack-cli binary
+	go build $(LDFLAGS) -o bin/slack-cli ./cmd/slack-cli
+
+test:              ## Run all tests
+	go test -race -count=1 ./...
+
+lint:              ## Run golangci-lint
+	golangci-lint run ./...
+
+install: build     ## Install slack-cli to $GOPATH/bin
+	go install $(LDFLAGS) ./cmd/slack-cli
+
+clean:             ## Remove build artifacts and generated files
+	rm -rf bin/
+	rm -f internal/registry/generated.go
+```
+
+### Version Embedding
+
+Build version, commit SHA, and date are injected via `ldflags` at build time and exposed through a `slack-cli version` subcommand:
+
+```go
+// cmd/slack-cli/main.go
+var (
+    version = "dev"
+    commit  = "unknown"
+    date    = "unknown"
+)
+
+// version subcommand
+versionCmd := &cobra.Command{
+    Use:   "version",
+    Short: "Print version information",
+    Run: func(cmd *cobra.Command, args []string) {
+        fmt.Printf("slack-cli %s (commit %s, built %s)\n", version, commit, date)
+    },
+}
+```
+
+### Shell Completion
+
+Cobra provides a built-in `completion` subcommand. The spec relies on this default behavior, which generates completion scripts for bash, zsh, fish, and powershell:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+eval "$(slack-cli completion bash)"
+eval "$(slack-cli completion zsh)"
+
+# Or generate a file
+slack-cli completion bash > /etc/bash_completion.d/slack-cli
+```
+
+Shell completion covers all generated subcommands (categories and actions), all global flags, and all per-command flags. This works automatically because commands are built using Cobra's `AddCommand` API at startup.
+
+### README Contents
+
+The project README MUST cover:
+
+1. **One-line description**: What the tool does and who it is for (agents and humans)
+2. **Installation**: `go install`, binary download, Homebrew (if published)
+3. **Quick start**: Set `SLACK_TOKEN`, run a basic command, see output
+4. **Authentication**: `SLACK_TOKEN` env var, stdin pipe, `--token` flag (with security warning)
+5. **Command structure**: How commands map to Slack API methods (`slack-cli <category> <action>`)
+6. **Common examples**: The most-used 5-6 commands with realistic flag values
+7. **Shell completion**: How to enable tab completion
+8. **Global flags reference**: Table of all global flags with descriptions
+9. **Output formats**: JSON (default) vs `--pretty`, piping to `jq`
+10. **Pagination**: `--all`, `--limit`, `--cursor`, `--max-results` explained
+11. **Error handling**: Exit codes and what they mean for automation
+12. **Building from source**: `make build`, `make generate`, `make test`
+13. **Contributing**: How to add override commands, how generation works
+
+### CLAUDE.md
+
+The project SHOULD include a `CLAUDE.md` at the repo root for AI agent developers. Contents:
+
+```markdown
+# CLAUDE.md - slack-cli
+
+## What this project is
+Go CLI wrapping the Slack Web API. Agent-first (JSON output), human-friendly (--pretty).
+
+## Build and test
+make generate  # Rebuild registry from slack-go/slack SDK
+make build     # Build binary to bin/slack-cli
+make test      # Run all tests with race detector
+make lint      # Run golangci-lint
+
+## Architecture
+- `generate/` - AST introspection of slack-go/slack, emits registry
+- `internal/registry/` - MethodDef structs, generated.go is the method table
+- `internal/dispatch/` - Cobra command builder, reflection executor, output formatting
+- `internal/override/` - Hand-crafted commands replacing generated ones
+- `cmd/slack-cli/` - Entry point
+
+## Key patterns
+- Methods using `...MsgOption` use option builder maps (dispatch/options.go)
+- Override system replaces generated commands for methods needing custom UX
+- Errors go to stderr (JSON), data goes to stdout
+- All SDK calls use *Context methods with cancellable context
+
+## Testing
+- Generator tests: verify AST parsing against known SDK methods
+- Dispatcher tests: mock registry, test flag-to-param mapping
+- E2E tests: build binary, invoke commands, check JSON output + exit codes
 ```
 
 ## Component Details
