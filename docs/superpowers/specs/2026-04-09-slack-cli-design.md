@@ -632,29 +632,32 @@ func ValidateChannelID(value string) error {
 }
 ```
 
-### 5. Error Handling (`internal/errors/`)
+### 5. Error Handling (`internal/exitcode/`)
 
-> **Note:** Section numbering corrected from duplicate "5" in earlier draft.
+`[REVIEW #4]` Package renamed from `errors` to `exitcode` to avoid shadowing the stdlib `errors` package.
 
 ```go
-package errors
+package exitcode
 
 const (
-    ExitOK         = 0 // Success
-    ExitAPIError   = 1 // Slack API returned an error
-    ExitAuthError  = 2 // Missing or invalid SLACK_TOKEN
-    ExitInputError = 3 // Invalid flags, missing required params
-    ExitNetError   = 4 // Network/HTTP failure
+    OK         = 0 // Success
+    APIError   = 1 // Slack API returned an error
+    AuthError  = 2 // Missing or invalid SLACK_TOKEN
+    InputError = 3 // Invalid flags, missing required params
+    NetError   = 4 // Network/HTTP failure
 )
 ```
 
-Error classification inspects the error chain using `errors.As`:
+Error classification inspects the error chain using stdlib `errors.As`:
 
-- `slack.SlackErrorResponse` with auth-related error strings -> ExitAuthError
-- `slack.SlackErrorResponse` (other) -> ExitAPIError
-- `slack.RateLimitedError` -> ExitAPIError (with `retry_after` in JSON output)
-- `slack.StatusCodeError` -> ExitNetError
-- Other errors -> ExitNetError
+- `slack.SlackErrorResponse` with auth-related error strings -> `AuthError`
+- `slack.SlackErrorResponse` (other) -> `APIError`
+- `slack.RateLimitedError` -> `APIError` (with `retry_after` in JSON output)
+- `slack.StatusCodeError` -> `NetError`
+- `context.DeadlineExceeded` / `context.Canceled` -> `NetError` `[REVIEW #12]`
+- Other errors -> `NetError`
+
+**Error wrapping convention:** Per Go guidelines, errors at system boundaries (SDK -> CLI) SHOULD use `%v` to drop internal structure. Errors within the CLI that callers need to inspect programmatically SHOULD use `%w`. Error strings MUST NOT be capitalized and MUST NOT end with punctuation.
 
 Error output format (always JSON to **stderr**, never stdout):
 
