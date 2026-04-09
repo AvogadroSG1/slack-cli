@@ -2,7 +2,32 @@
 
 ## Overview
 
-A Go CLI (`slack-cli`) that wraps the full Slack Web API (excluding `admin.*` methods) using the `slack-go/slack` library. Designed for dual use: AI agents (JSON-first output) and humans (`--pretty` flag). Commands are auto-generated from the `slack-go/slack` SDK via `go generate` AST introspection.
+A Go CLI (`slack-cli`) that wraps the full Slack Web API (excluding `admin.*` methods) using the `slack-go/slack` library. Designed for dual use: AI agents (JSON-first output) and humans (`--pretty` flag). Commands and type-safe dispatch functions are auto-generated from the `slack-go/slack` SDK via `go generate` using `golang.org/x/tools/go/packages` for full type-checked introspection.
+
+## Review Notes (2026-04-09)
+
+> Architecture review focused on Go idioms, performance, and correctness.
+> Each item is categorized as **Critical** (MUST fix before implementation),
+> **Important** (SHOULD fix), or **Suggestion** (MAY improve).
+> Items are addressed inline throughout the spec, marked with `[REVIEW #N]`.
+>
+> **Critical:**
+> 1. Replace reflection-based executor with generated type-safe dispatch functions -- see [Executor](#executorgo)
+> 2. Use `root.ExecuteContext(ctx)` instead of `root.Execute()` to propagate context -- see [Entry Point](#8-entry-point-cmdslack-climaingo)
+> 3. `FormatOutput` MUST write to `io.Writer` param, not hardcoded `os.Stdout` -- see [output.go](#outputgo)
+> 4. Rename `internal/errors` to `internal/exitcode` to avoid shadowing stdlib `errors` -- see [Error Handling](#5-error-handling-internalexitcode)
+> 5. Testing MUST use stdlib `testing` + `go-cmp`, NOT testify (per project Go guidelines) -- see [Testing Strategy](#testing-strategy)
+>
+> **Important:**
+> 6. Generator MUST use `golang.org/x/tools/go/packages` for full type resolution, not raw `go/ast` alone -- see [Code Generator](#2-code-generator-cmdintrospect)
+> 7. Stream paginated results via `json.Encoder` per-page instead of accumulating in memory -- see [pagination.go](#paginationgo)
+> 8. Move `generate/` to `cmd/introspect/` so it is a proper `go generate` tool binary -- see [Project Structure](#project-structure)
+> 9. `SDKMethod` field is unused for dispatch if we generate type-safe functions; retain only as documentation metadata -- see [Method Registry](#1-method-registry-internalregistry)
+> 10. Option builder maps (`chatOptionBuilders`) SHOULD also be generated, not hand-maintained -- see [MsgOption Handling](#msgoption-handling-strategy)
+>
+> **Suggestion:**
+> 11. Consider `golang.org/x/sync/errgroup` for future concurrent operations (batch commands, parallel uploads)
+> 12. Add `context.DeadlineExceeded` / `context.Canceled` to error classification -- see [Error Handling](#5-error-handling-internalexitcode)
 
 ## Decisions
 
