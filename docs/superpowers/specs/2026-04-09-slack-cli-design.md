@@ -177,12 +177,16 @@ func BuildCommands(root *cobra.Command, reg []registry.MethodDef, overrides map[
 Executes SDK calls via reflection:
 
 ```go
-func Execute(client *slack.Client, method registry.MethodDef, flags map[string]interface{}) (interface{}, error) {
-    // 1. Look up the method on *slack.Client by SDKMethod name
-    // 2. Build arguments from flags using ParamDef type info
-    // 3. Call the method with context.Background() (or a timeout context)
-    // 4. Extract return values, separate data from error
-    // 5. Return the data for output formatting
+func Execute(ctx context.Context, client *slack.Client, method registry.MethodDef, flags map[string]interface{}) (interface{}, error) {
+    // 1. Validate all required flags are present and pass format validation
+    // 2. Look up the method on *slack.Client by SDKMethod name
+    // 3. Build arguments from flags using ParamDef type info
+    // 4. Apply per-request timeout: wrap ctx with method.DefaultTimeout or global --timeout
+    //    timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+    //    defer cancel()
+    // 5. Call the method with timeoutCtx (all SDK *Context methods accept context.Context)
+    // 6. Extract return values, separate data from error
+    // 7. Return the data for output formatting
 }
 ```
 
