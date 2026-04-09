@@ -136,26 +136,28 @@ graph TD
     B --> D[override/*.go]
     B --> E[Cobra Command Tree]
     E --> F[dispatch/executor.go]
-    F --> G[slack-go/slack Client]
-    F --> H[dispatch/output.go]
-    F --> I[dispatch/pagination.go]
-    H --> J[JSON stdout]
-    H --> K[Pretty stdout]
+    F -->|generated type-safe calls| G[dispatch/generated_dispatch.go]
+    G --> H[slack-go/slack Client]
+    F --> I[dispatch/output.go]
+    F --> J[dispatch/pagination.go]
+    I --> K[JSON stdout]
+    I --> L[Pretty stdout]
     
-    L[generate/introspect.go] -->|go generate| C
+    M[cmd/introspect/main.go] -->|go generate| C
+    M -->|go generate| G
     
-    M[errors/errors.go] --> F
-    N[validate/validate.go] --> F
+    N[exitcode/exitcode.go] --> F
+    O[validate/validate.go] --> F
 ```
 
 ### Flow
 
-1. `main.go` sets up signal handling (`SIGINT`/`SIGTERM` -> cancellable context), then initializes the root Cobra command with global flags (`--pretty`, `--all`, `--limit`, `--cursor`, `--timeout`, `--debug`, `--token`, `--wait-on-rate-limit`, `--max-results`)
+1. `main.go` creates a cancellable `context.Context` via `signal.NotifyContext` for `SIGINT`/`SIGTERM`, then initializes the root Cobra command with global flags and calls `root.ExecuteContext(ctx)` `[REVIEW #2]`
 2. `dispatch/builder.go` reads the method registry and dynamically builds the Cobra command tree at startup
 3. Override commands (if any) replace registry entries for specific methods
-4. When a command executes, `dispatch/executor.go` maps CLI flags to SDK method parameters and calls the appropriate `slack-go/slack` method via reflection
-5. `dispatch/output.go` formats the response (JSON default, or pretty-printed if `--pretty`)
-6. `dispatch/pagination.go` handles `--all` by following cursors automatically
+4. When a command executes, `dispatch/executor.go` looks up the generated type-safe dispatch function by API method name and calls it (no reflection) `[REVIEW #1]`
+5. `dispatch/output.go` formats the response to an `io.Writer` parameter (JSON default, or pretty-printed if `--pretty`) `[REVIEW #3]`
+6. `dispatch/pagination.go` handles `--all` by following cursors, streaming each page via `json.Encoder` `[REVIEW #7]`
 
 ## Project Structure
 
