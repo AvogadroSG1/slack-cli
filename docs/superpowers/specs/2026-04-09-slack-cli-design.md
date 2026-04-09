@@ -528,12 +528,14 @@ The `CallStyle` field in `MethodDef` is used by the **generator** (not the execu
 
 #### output.go
 
+`[REVIEW #3]` Output functions MUST accept an `io.Writer` parameter instead of writing directly to `os.Stdout`. This enables testing without capturing stdout and supports output redirection.
+
 ```go
-func FormatOutput(data interface{}, pretty bool) error {
+func FormatOutput(w io.Writer, data any, pretty bool) error {
     if pretty {
-        return formatPretty(data) // tabwriter or similar
+        return formatPretty(w, data) // tabwriter or similar
     }
-    encoder := json.NewEncoder(os.Stdout)
+    encoder := json.NewEncoder(w)
     encoder.SetIndent("", "  ")
     return encoder.Encode(data)
 }
