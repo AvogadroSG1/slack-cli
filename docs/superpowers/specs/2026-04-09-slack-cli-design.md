@@ -375,7 +375,10 @@ func main() {
     root.PersistentFlags().Int("limit", 0, "Max results with --all")
     root.PersistentFlags().String("cursor", "", "Pagination cursor")
     root.PersistentFlags().Duration("timeout", 30*time.Second, "Request timeout")
-    root.PersistentFlags().Bool("debug", false, "Debug HTTP traffic to stderr")
+    root.PersistentFlags().Bool("debug", false, "Debug HTTP traffic to stderr (Authorization header redacted)")
+    root.PersistentFlags().String("token", "", "Slack API token (WARNING: visible in process table)")
+    root.PersistentFlags().Bool("wait-on-rate-limit", false, "Sleep and retry on rate limit")
+    root.PersistentFlags().Int("max-results", 10000, "Hard cap on --all pagination results")
     
     // Auth: env var (primary), stdin pipe (secondary), --token flag (warn + accept)
     token := os.Getenv("SLACK_TOKEN")
