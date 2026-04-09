@@ -391,18 +391,22 @@ Executes SDK calls via reflection:
 ```go
 func Execute(ctx context.Context, client *slack.Client, method registry.MethodDef, flags map[string]interface{}) (interface{}, error) {
     // 1. Validate all required flags are present and pass format validation
-    // 2. Look up the method on *slack.Client by SDKMethod name
-    // 3. Build arguments from flags using ParamDef type info
-    // 4. Apply per-request timeout: wrap ctx with method.DefaultTimeout or global --timeout
+    // 2. Apply per-request timeout: wrap ctx with method.DefaultTimeout or global --timeout
     //    timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
     //    defer cancel()
-    // 5. Call the method with timeoutCtx (all SDK *Context methods accept context.Context)
+    // 3. Route based on method.CallStyle:
+    //    - "positional": pass simple params in order after ctx
+    //    - "struct": create struct via reflection, populate fields from flags
+    //    - "msgoption": extract channelID, build []MsgOption from option builder map
+    //    - "custom-option": similar to msgoption but with method-specific option type
+    // 4. Look up the method on *slack.Client by SDKMethod name
+    // 5. Call the method via reflection with constructed arguments
     // 6. Extract return values, separate data from error
     // 7. Return the data for output formatting
 }
 ```
 
-For struct parameters, the executor creates the struct via reflection and populates fields from CLI flags. For simple parameters, it passes them positionally.
+The `CallStyle` field in `MethodDef` determines how flags are mapped to SDK method arguments. This is the critical design point: the executor is not one-size-fits-all. See the MsgOption Handling Strategy section for details on the `"msgoption"` call style.
 
 #### output.go
 
