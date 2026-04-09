@@ -305,21 +305,24 @@ make test      # Run all tests with race detector
 make lint      # Run golangci-lint
 
 ## Architecture
-- `generate/` - AST introspection of slack-go/slack, emits registry
+- `cmd/introspect/` - Type-checked introspection of slack-go/slack, emits registry + dispatch
 - `internal/registry/` - MethodDef structs, generated.go is the method table
-- `internal/dispatch/` - Cobra command builder, reflection executor, output formatting
+- `internal/dispatch/` - Cobra command builder, generated type-safe dispatch (no reflection), output formatting
 - `internal/override/` - Hand-crafted commands replacing generated ones
-- `cmd/slack-cli/` - Entry point
+- `internal/exitcode/` - Exit code constants and error classifier
+- `cmd/slack-cli/` - Entry point with signal handling
 
 ## Key patterns
-- Methods using `...MsgOption` use option builder maps (dispatch/options.go)
+- Generated dispatch: type-safe SDK calls, no runtime reflection
+- Methods using `...MsgOption` use generated option builder maps
 - Override system replaces generated commands for methods needing custom UX
 - Errors go to stderr (JSON), data goes to stdout
 - All SDK calls use *Context methods with cancellable context
+- Testing: stdlib testing + go-cmp, httptest.Server for mocking, table-driven tests
 
 ## Testing
-- Generator tests: verify AST parsing against known SDK methods
-- Dispatcher tests: mock registry, test flag-to-param mapping
+- Generator tests: verify type-checked introspection against known SDK methods
+- Dispatcher tests: httptest.Server mocks, test flag-to-param mapping
 - E2E tests: build binary, invoke commands, check JSON output + exit codes
 ```
 
