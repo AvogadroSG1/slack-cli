@@ -213,8 +213,8 @@ LDFLAGS  := -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X mai
 
 .PHONY: generate build test lint install clean
 
-generate:          ## Run go generate to rebuild registry from SDK source
-	go generate ./generate/...
+generate:          ## Run go generate to rebuild registry and dispatch from SDK source
+	go generate ./cmd/introspect/...
 
 build: generate    ## Build the slack-cli binary
 	go build $(LDFLAGS) -o bin/slack-cli ./cmd/slack-cli
