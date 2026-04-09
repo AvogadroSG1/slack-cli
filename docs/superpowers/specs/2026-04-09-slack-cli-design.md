@@ -1128,7 +1128,7 @@ The `--all` flag with no limit could theoretically accumulate millions of record
 Safeguards:
 
 1. **Hard cap (`--max-results`)**: Default 10,000. Prevents unbounded memory growth. Users who genuinely need more MUST explicitly set `--max-results 0` (unlimited) or a higher value.
-2. **Streaming output (future)**: For v1, results are accumulated in memory and written at the end. A future `--stream` flag SHOULD write NDJSON (newline-delimited JSON) to stdout as each page arrives, keeping memory constant regardless of result count.
+2. **Streaming output**: `[REVIEW #7]` When `--all` is used, results are streamed as JSON Lines (one JSON object per line) to stdout as each page arrives, keeping memory constant regardless of result count. Non-paginated and single-page requests use standard JSON output.
 3. **Progress indication**: During `--all` pagination, emit page count and running total to stderr: `"Fetching page 5... (2,500 results so far)"`
 
 ## Out of Scope
