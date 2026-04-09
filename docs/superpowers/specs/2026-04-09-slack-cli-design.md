@@ -378,20 +378,40 @@ type MethodDef struct {
 var Registry []MethodDef
 ```
 
-### 2. Code Generator (`generate/introspect.go`)
+### 2. Code Generator (`cmd/introspect/`)
 
-A `go generate` tool that:
+`[REVIEW #6]` A `go generate` tool binary that uses `golang.org/x/tools/go/packages` for full type-checked introspection.
 
-1. Locates the `slack-go/slack` package in the module cache
-2. Parses all `.go` files using `go/ast` and `go/types`
-3. Finds all methods on `*Client` that end with `Context`
+**Why `golang.org/x/tools/go/packages` instead of raw `go/ast`:** Raw `go/ast` parsing cannot resolve types across packages. When the SDK defines a method like `PostMessageContext(ctx context.Context, channelID string, options ...MsgOption)`, raw AST sees `MsgOption` as an unresolved identifier. The `go/packages` loader runs the full type checker, resolving all types, following type aliases, and expanding embedded structs. This is essential for:
+
+- Correctly identifying parameter types defined in other packages or files
+- Resolving type aliases (e.g., `type ChannelID = string`)
+- Expanding embedded struct fields in parameter structs
+- Distinguishing `context.Context` parameters from other interface types
+- Detecting which return values implement `error`
+- Identifying `MsgOption` and similar functional option types for `CallStyle` detection
+
+The tool:
+
+1. Loads the `slack-go/slack` package using `packages.Load` with `packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo`
+2. Iterates the type-checked method set of `*slack.Client`
+3. Finds all methods ending with `Context` (the context-aware variants)
 4. For each method:
    - Extracts the method name, maps to API method name (e.g., `PostMessageContext` -> `chat.postMessage`)
-   - Inspects parameter types: simple params become individual `ParamDef` entries; struct params are expanded field-by-field
+   - Inspects parameter types using `types.Func` signatures: simple params become individual `ParamDef` entries; struct params are expanded field-by-field
+   - Detects `...MsgOption` and similar functional option patterns to set `CallStyle`
    - Detects pagination by looking for `Cursor` fields in param structs and `NextCursor` in response types
    - Skips methods whose extracted API endpoint starts with `admin.` (per scope exclusion)
    - Also skips `ConnectRTM`, `StartRTM`, `StartSocketMode` (persistent connection methods, not request-response)
-5. Emits `internal/registry/generated.go` containing the populated `Registry` slice
+5. Emits two files:
+   - `internal/registry/generated.go` containing the populated `Registry` slice
+   - `internal/dispatch/generated_dispatch.go` containing type-safe dispatch functions and option builder maps `[REVIEW #1, #10]`
+
+**`[REVIEW #6]` Known pitfalls of `go/packages`:**
+- **Build tags:** The SDK may use build tags for platform-specific code. The loader MUST be configured with the correct `GOOS`/`GOARCH`.
+- **Vendor directories:** If the project uses vendoring, the load config MUST set `Dir` to the project root.
+- **Module cache freshness:** The generator SHOULD verify the loaded SDK version matches `go.mod` to prevent stale generation.
+- **Performance:** `go/packages` is slower than raw AST (~2-5s vs ~200ms). Acceptable for a `go generate` tool that runs infrequently.
 
 **Important: legacy admin methods in `admin.go`**
 
