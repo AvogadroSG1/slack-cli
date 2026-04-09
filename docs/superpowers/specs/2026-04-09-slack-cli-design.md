@@ -625,4 +625,4 @@ Safeguards:
 - Socket Mode / RTM (persistent connections, not request-response)
 - Events API webhooks
 - Slack app manifest management
-- Built-in retry logic (agents handle their own retry)
+- Automatic retry by default (agents handle their own retry; opt-in `--wait-on-rate-limit` is available for rate limits only)
