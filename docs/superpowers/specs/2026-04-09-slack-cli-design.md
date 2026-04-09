@@ -155,7 +155,8 @@ slack-cli/
 │       └── errors.go            # Exit code mapping
 ├── generate/
 │   ├── introspect.go            # AST parser for slack-go/slack
-│   └── templates.go             # Go templates for generated code
+│   ├── templates.go             # Go templates for generated code
+│   └── descriptions.yaml        # Hand-maintained method descriptions for help text
 ├── go.mod                       # module github.com/poconnor/slack-cli
 ├── go.sum
 ├── Makefile                     # See Makefile Targets section
