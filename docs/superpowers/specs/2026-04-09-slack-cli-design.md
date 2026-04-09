@@ -427,9 +427,20 @@ File upload methods (`files.upload`, `files.uploadV2`) use multipart form data. 
 
 When the SDK returns `RateLimitedError`, the CLI:
 
-- Outputs the error as JSON with `retry_after` field
-- Exits with code 1
-- Does NOT auto-retry (agents handle their own retry logic)
+- Outputs the error as JSON to **stderr** with `retry_after` field (seconds) and a human-readable message
+- Emits the `Retry-After` value prominently so callers can act on it:
+  ```json
+  {
+      "ok": false,
+      "error": "rate_limited",
+      "retry_after_seconds": 30,
+      "message": "Rate limited by Slack API. Retry after 30 seconds.",
+      "exit_code": 1
+  }
+  ```
+- If `--wait-on-rate-limit` is set: sleeps for the `Retry-After` duration, then retries the request (up to 3 retries max, to prevent infinite loops). Emits a progress message to stderr: `"Rate limited. Waiting 30s before retry (attempt 2/3)..."`
+- If `--wait-on-rate-limit` is NOT set (default): exits with code 1 immediately. Agents handle their own retry logic.
+- During `--all` pagination: if `--wait-on-rate-limit` is set, rate limits are handled transparently per-page. If not set, the CLI returns all results collected so far plus a `"partial": true` field and the cursor for resumption.
 
 ### Methods with io.Writer (Downloads)
 
