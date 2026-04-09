@@ -43,9 +43,9 @@ A Go CLI (`slack-cli`) that wraps the full Slack Web API (excluding `admin.*` me
 | Subcommand Style | Nested (`slack-cli chat post-message`) | Discoverable, organized, matches `gh`/`aws` conventions |
 | Command Naming | Derived from Slack API method name, not Go method name | `chat.postMessage` -> `chat post-message`; the API name is stable, canonical, and documented (see Command Naming Strategy) |
 | Flag Naming | Slack API param names converted to kebab-case | `channel_id` -> `--channel-id`; reduces cognitive mapping for users referencing Slack API docs |
-| Code Generation | `go generate` + Go AST introspection | Single toolchain, generates method registry from SDK source |
-| Architecture | Thin dispatch layer + generated method table | Simple generator, generic dispatcher, override escape hatch |
-| Pagination | Single page default, `--all` to auto-paginate | Safe default, explicit opt-in for full data |
+| Code Generation | `go generate` + `golang.org/x/tools/go/packages` | `[REVIEW #6]` Full type resolution; generates both method registry and type-safe dispatch functions |
+| Architecture | Generated type-safe dispatch + method registry | `[REVIEW #1]` No runtime reflection; compile-time safety; override escape hatch |
+| Pagination | Single page default, `--all` to auto-paginate with streaming | `[REVIEW #7]` Safe default, explicit opt-in, memory-bounded via per-page streaming |
 | Errors | Exit 1 + JSON **to stderr** for API errors; exit 2-4 for CLI failures | Agents distinguish API errors from tool failures; stdout reserved for data only |
 | Scope | All Web API methods except `admin.*` | ~166 `*Context` methods across ~28 categories (after excluding admin, RTM, socket mode) |
 | Version Info | Embedded via `ldflags` at build time | `slack-cli version` prints version, git commit SHA, build date |
