@@ -26,6 +26,80 @@ A Go CLI (`slack-cli`) that wraps the full Slack Web API (excluding `admin.*` me
 | Version Info | Embedded via `ldflags` at build time | `slack-cli version` prints version, git commit SHA, build date |
 | Shell Completion | Cobra built-in `completion` subcommand | `slack-cli completion bash/zsh/fish/powershell` for tab completion of all commands and flags |
 
+## Command Naming Strategy
+
+Commands are derived from the **Slack API method name** (the string literal extracted from the SDK source), not from the Go method name. This is a deliberate choice: the API method name is the canonical, stable identifier that appears in Slack's documentation, error messages, and rate limit headers.
+
+**Conversion rules:**
+
+1. Split the API method name on `.` to get category and action: `chat.postMessage` -> category `chat`, action `postMessage`
+2. Convert the action from camelCase to kebab-case: `postMessage` -> `post-message`
+3. The resulting CLI command is `slack-cli <category> <action>`: `slack-cli chat post-message`
+
+**Ergonomic aliases for high-frequency commands:**
+
+Some commands benefit from shorter aliases that feel natural in a shell. These are registered as Cobra command aliases, not separate commands:
+
+| Full command | Alias | Rationale |
+|---|---|---|
+| `slack-cli chat post-message` | `slack-cli chat send` | "send a message" is the natural phrasing |
+| `slack-cli conversations list` | `slack-cli channels list` | "channels" is more intuitive than "conversations" |
+| `slack-cli conversations history` | `slack-cli channels history` | Same rationale |
+| `slack-cli reactions add` | `slack-cli react` | Common shorthand |
+
+Aliases appear in help text as `Aliases: send, post-message` so users discover both forms.
+
+**Flag naming convention:**
+
+Flags match the Slack API parameter names converted to kebab-case. This means a user reading the Slack API docs for `chat.postMessage` sees parameter `channel` and uses `--channel`, sees `thread_ts` and uses `--thread-ts`. The flag-to-API-param mapping is 1:1 and predictable.
+
+Exception: where the API uses ambiguous single-word params (e.g., `channel` could be a name or ID), the CLI flag SHOULD use the more specific form (`--channel` for ID, with validation that rejects plain channel names).
+
+## MsgOption Handling Strategy
+
+Several SDK methods (all chat methods, some canvas methods) use the `...MsgOption` functional options pattern instead of struct parameters. The reflection-based executor cannot simply pass string values to these methods -- it MUST construct `MsgOption` values from CLI flags.
+
+**SDK methods affected:** `PostMessageContext`, `UpdateMessageContext`, `PostEphemeralContext`, `ScheduleMessageContext`, `SendMessageContext`, `StartStreamContext`, `AppendStreamContext`, `StopStreamContext`, plus canvas and usergroup methods with their own option types.
+
+**Approach: Option Builder Map**
+
+The executor maintains a mapping from flag names to `MsgOption` constructor functions:
+
+```go
+// optionBuilders maps CLI flag names to MsgOption constructors for chat methods.
+var chatOptionBuilders = map[string]func(value string) slack.MsgOption{
+    "text":             func(v string) slack.MsgOption { return slack.MsgOptionText(v, true) },
+    "thread-ts":        func(v string) slack.MsgOption { return slack.MsgOptionTS(v) },
+    "reply-broadcast":  func(_ string) slack.MsgOption { return slack.MsgOptionBroadcast() },
+    "unfurl-links":     func(_ string) slack.MsgOption { return slack.MsgOptionEnableLinkUnfurl() },
+    "icon-url":         func(v string) slack.MsgOption { return slack.MsgOptionIconURL(v) },
+    "icon-emoji":       func(v string) slack.MsgOption { return slack.MsgOptionIconEmoji(v) },
+    "blocks":           func(v string) slack.MsgOption { return parseMsgOptionBlocks(v) },
+    "metadata":         func(v string) slack.MsgOption { return parseMsgOptionMetadata(v) },
+    // ... remaining MsgOption mappings
+}
+```
+
+For chat methods, the `MethodDef` includes a `CallStyle` field that tells the executor to use the option builder map instead of positional/struct reflection:
+
+```go
+type MethodDef struct {
+    // ... existing fields ...
+    CallStyle string // "positional", "struct", "msgoption", "custom-option"
+}
+```
+
+The generator detects `...MsgOption` in the method signature and sets `CallStyle: "msgoption"`. The executor then:
+
+1. Extracts the `channelID` (first positional param after context) from flags
+2. Iterates remaining flags, looking up each in `chatOptionBuilders`
+3. Collects the resulting `[]MsgOption` slice
+4. Calls the method: `client.PostMessageContext(ctx, channelID, options...)`
+
+This approach handles the 45+ `MsgOption` functions without requiring each chat command to be a full override. Methods with custom option types (`GetConversationsOption`, `CreateUserGroupOption`, etc.) use analogous builder maps keyed by option type name.
+
+**When to use overrides instead:** If a method's option pattern is too unusual for the builder map (e.g., `UnfurlMessageContext` which takes both positional `map[string]Attachment` AND `...MsgOption`), it SHOULD be implemented as an override command.
+
 ## Architecture
 
 ```mermaid
