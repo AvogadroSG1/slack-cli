@@ -9,17 +9,22 @@ A Go CLI (`slack-cli`) that wraps the full Slack Web API (excluding `admin.*` me
 | Decision | Choice | Rationale |
 |---|---|---|
 | Language | Go | Single binary distribution, strong typing, fast execution |
-| SDK | `github.com/slack-go/slack` | Most complete Go Slack library, 411+ methods |
-| CLI Framework | Cobra | Industry standard for Go CLIs, tab completion, nested subcommands |
-| Binary Name | `slack-cli` | Avoids conflicts with Slack desktop app |
+| SDK | `github.com/slack-go/slack` v0.21.1 | Most complete Go Slack library; 166 `*Context` methods on `*Client` |
+| CLI Framework | Cobra | Industry standard for Go CLIs, built-in completion for bash/zsh/fish/powershell, nested subcommands |
+| Binary Name | `slack-cli` | Avoids conflicts with Slack desktop app and Slack's own `slack` CLI tool |
+| Module Path | `github.com/poconnor/slack-cli` | Standard Go module path for GitHub-hosted projects |
 | Auth | `SLACK_TOKEN` env var (primary), stdin pipe (secondary) | 12-factor compliant, simple for agents and CI; stdin support for secret managers |
 | Output Default | JSON | Agent-first; `--pretty` flag for human-readable tables/text |
 | Subcommand Style | Nested (`slack-cli chat post-message`) | Discoverable, organized, matches `gh`/`aws` conventions |
+| Command Naming | Derived from Slack API method name, not Go method name | `chat.postMessage` -> `chat post-message`; the API name is stable, canonical, and documented (see Command Naming Strategy) |
+| Flag Naming | Slack API param names converted to kebab-case | `channel_id` -> `--channel-id`; reduces cognitive mapping for users referencing Slack API docs |
 | Code Generation | `go generate` + Go AST introspection | Single toolchain, generates method registry from SDK source |
 | Architecture | Thin dispatch layer + generated method table | Simple generator, generic dispatcher, override escape hatch |
 | Pagination | Single page default, `--all` to auto-paginate | Safe default, explicit opt-in for full data |
 | Errors | Exit 1 + JSON **to stderr** for API errors; exit 2-4 for CLI failures | Agents distinguish API errors from tool failures; stdout reserved for data only |
-| Scope | All Web API methods except `admin.*` | ~350+ methods across ~28 categories |
+| Scope | All Web API methods except `admin.*` | ~166 `*Context` methods across ~28 categories (after excluding admin, RTM, socket mode) |
+| Version Info | Embedded via `ldflags` at build time | `slack-cli version` prints version, git commit SHA, build date |
+| Shell Completion | Cobra built-in `completion` subcommand | `slack-cli completion bash/zsh/fish/powershell` for tab completion of all commands and flags |
 
 ## Architecture
 
