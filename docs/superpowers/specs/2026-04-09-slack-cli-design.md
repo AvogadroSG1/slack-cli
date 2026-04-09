@@ -966,9 +966,10 @@ Safeguards:
 
 ## Out of Scope
 
-- Admin API methods (`admin.*`)
+- Admin API methods (`admin.*`) -- these require admin tokens and have different authorization patterns
 - Interactive OAuth flow (use `SLACK_TOKEN` directly)
-- Socket Mode / RTM (persistent connections, not request-response)
-- Events API webhooks
-- Slack app manifest management
+- Socket Mode / RTM (persistent connections, not request-response; the CLI is request-response only)
+- Events API webhooks (requires a running HTTP server, not a CLI concern)
+- Slack app manifest management (the SDK has manifest methods but these are app-developer tooling, not API consumer tooling)
 - Automatic retry by default (agents handle their own retry; opt-in `--wait-on-rate-limit` is available for rate limits only)
+- Config file support (no `~/.slack-cli.yaml`; env vars and flags only, per 12-factor)
