@@ -164,35 +164,43 @@ graph TD
 ```
 slack-cli/
 ├── cmd/
-│   └── slack-cli/
-│       └── main.go              # Entry point, root Cobra command, version info
+│   ├── slack-cli/
+│   │   └── main.go                  # Entry point, root Cobra command, signal handling
+│   └── introspect/
+│       ├── main.go                  # [REVIEW #8] go generate tool binary
+│       ├── templates.go             # Go templates for generated code
+│       └── descriptions.yaml        # Hand-maintained method descriptions for help text
 ├── internal/
 │   ├── registry/
-│   │   ├── method.go            # MethodDef struct, registry types
-│   │   └── generated.go         # go:generate output - the method table
+│   │   ├── method.go                # MethodDef struct, registry types
+│   │   └── generated.go             # go:generate output - the method table
 │   ├── dispatch/
-│   │   ├── builder.go           # Builds Cobra tree from registry
-│   │   ├── executor.go          # Calls slack-go methods via reflection
-│   │   ├── options.go           # MsgOption builder maps (chat, usergroup, etc.)
-│   │   ├── output.go            # JSON default / --pretty formatting
-│   │   └── pagination.go        # --all / --cursor / --limit handling
+│   │   ├── builder.go               # Builds Cobra tree from registry
+│   │   ├── executor.go              # [REVIEW #1] Delegates to generated dispatch; no reflection
+│   │   ├── generated_dispatch.go    # [REVIEW #1] go:generate output - type-safe SDK call functions
+│   │   ├── output.go                # [REVIEW #3] JSON/pretty formatting; writes to io.Writer param
+│   │   └── pagination.go            # [REVIEW #7] --all with streaming output
 │   ├── override/
-│   │   └── override.go          # Override registry + hand-crafted commands
+│   │   └── override.go              # Override registry + hand-crafted commands
 │   ├── validate/
-│   │   └── validate.go          # Input validation (IDs, paths, JSON, limits)
-│   └── errors/
-│       └── errors.go            # Exit code mapping
-├── generate/
-│   ├── introspect.go            # AST parser for slack-go/slack
-│   ├── templates.go             # Go templates for generated code
-│   └── descriptions.yaml        # Hand-maintained method descriptions for help text
-├── go.mod                       # module github.com/poconnor/slack-cli
+│   │   └── validate.go              # Input validation (IDs, paths, JSON, limits)
+│   └── exitcode/
+│       └── exitcode.go              # [REVIEW #4] Exit code constants and error classifier
+├── go.mod                           # module github.com/poconnor/slack-cli
 ├── go.sum
-├── Makefile                     # See Makefile Targets section
-├── CLAUDE.md                    # AI agent developer instructions
-├── README.md                    # See README section
+├── Makefile                         # See Makefile Targets section
+├── CLAUDE.md                        # AI agent developer instructions
+├── README.md                        # See README section
 └── docs/
 ```
+
+**`[REVIEW #8]` Why `cmd/introspect/` instead of `generate/`:** The code generator is a standalone Go binary invoked by `go generate`. Placing it under `cmd/` follows the standard Go project layout convention where each subdirectory of `cmd/` is a separate binary. With `cmd/introspect/`, the `go:generate` directive becomes:
+
+```go
+//go:generate go run ./cmd/introspect
+```
+
+**`[REVIEW #4]` Why `internal/exitcode/` instead of `internal/errors/`:** A package named `errors` shadows the stdlib `errors` package. Every file that imports both would require aliasing (`stderrors "errors"`), which violates the Go guideline that import renaming SHOULD NOT be needed unless avoiding collision. The name `exitcode` also more accurately describes the package's purpose: mapping error conditions to process exit codes.
 
 ### Makefile Targets
 
