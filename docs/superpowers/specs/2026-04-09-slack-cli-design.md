@@ -474,6 +474,139 @@ When the SDK returns `RateLimitedError`, the CLI:
 
 Methods like `GetFile` that write to `io.Writer` are special-cased in the executor to write binary data to stdout or to a path specified by `--output`.
 
+## Security and Reliability
+
+### Token Security
+
+The CLI MUST follow a strict token precedence order:
+
+1. `SLACK_TOKEN` environment variable (RECOMMENDED, 12-factor compliant)
+2. Stdin pipe (for secret manager integration, e.g., `vault read -field=token secret/slack | slack-cli ...`)
+3. `--token` flag (ACCEPTED but triggers a stderr warning about process table visibility)
+
+The `--token` flag exists for convenience but the CLI MUST emit a warning to stderr when it is used:
+```
+WARNING: passing tokens via --token flag exposes them in the process table and shell history.
+Use SLACK_TOKEN env var or stdin pipe instead.
+```
+
+Stdin token reading MUST use `io.LimitReader` capped at 256 bytes to prevent memory exhaustion from
+accidental piping of large files.
+
+### Debug Output Redaction
+
+When `--debug` is enabled, HTTP traffic is printed to stderr. The debug transport MUST redact
+sensitive headers before printing:
+
+- `Authorization: Bearer xoxb-****` (show only prefix `xoxb-` plus last 4 characters)
+- `Cookie` headers: fully redacted
+- Any header containing `token`, `secret`, or `key` (case-insensitive): value replaced with `[REDACTED]`
+
+Implementation: wrap the HTTP client's transport with a `RedactingTransport` that intercepts
+round-trip logging. This ensures tokens never appear in debug output, terminal scrollback,
+or log captures.
+
+```go
+type RedactingTransport struct {
+    Inner http.RoundTripper
+}
+
+func (t *RedactingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+    redacted := cloneRequestForLogging(req)
+    if auth := redacted.Header.Get("Authorization"); auth != "" {
+        redacted.Header.Set("Authorization", redactBearerToken(auth))
+    }
+    logRequest(redacted) // print to stderr
+    resp, err := t.Inner.RoundTrip(req) // use original unredacted request
+    if resp != nil {
+        logResponse(resp) // response bodies may contain tokens in error messages; redact those too
+    }
+    return resp, err
+}
+```
+
+### Signal Handling (SIGINT/SIGTERM)
+
+The CLI MUST handle OS signals gracefully, especially during `--all` pagination where multiple
+API calls are in flight sequentially:
+
+1. Register a signal handler for `SIGINT` and `SIGTERM` at startup
+2. Pass a cancellable `context.Context` through the entire call chain
+3. On signal receipt, cancel the context
+4. The pagination loop checks `ctx.Done()` between pages and returns partial results
+5. Partial results include the last cursor for resumption:
+   ```json
+   {
+       "results": [...],
+       "partial": true,
+       "next_cursor": "dXNlcjpVMDYx...",
+       "reason": "interrupted"
+   }
+   ```
+6. The CLI exits with code 0 when partial results are successfully written (data was returned)
+
+This follows 12-factor principle IX (Disposability): maximize robustness with graceful shutdown.
+
+### File Upload Security
+
+When the `--file` flag is used for upload methods:
+
+1. **Path validation**: Resolve the path with `filepath.EvalSymlinks()` to follow symlinks, then verify the resolved path exists and is a regular file (not a directory, device, or socket)
+2. **Symlink transparency**: After resolving, log the resolved path to stderr if it differs from the original (so the user sees what is actually being uploaded)
+3. **No path traversal via API params**: The `--file` flag MUST only accept local filesystem paths. Values starting with `http://` or `https://` MUST be rejected (use `--external-url` for URL-based uploads if the API supports it)
+4. **File size check**: Read the file size before uploading. If the file exceeds Slack's upload limit (currently 1GB for paid plans), fail immediately with a clear error rather than waiting for the API to reject it
+5. **Permissions check**: Verify the file is readable before starting the upload
+
+```go
+func ValidateFilePath(path string) (string, error) {
+    resolved, err := filepath.EvalSymlinks(path)
+    if err != nil {
+        return "", fmt.Errorf("cannot resolve file path %q: %w", path, err)
+    }
+    info, err := os.Stat(resolved)
+    if err != nil {
+        return "", fmt.Errorf("cannot stat file %q: %w", resolved, err)
+    }
+    if !info.Mode().IsRegular() {
+        return "", fmt.Errorf("path %q is not a regular file", resolved)
+    }
+    if resolved != path {
+        fmt.Fprintf(os.Stderr, "Note: %q resolved to %q via symlink\n", path, resolved)
+    }
+    return resolved, nil
+}
+```
+
+### Timeout Strategy
+
+The default `--timeout` of 30s applies per-request, not to the total `--all` pagination session.
+This is the correct behavior: a single page fetch should not take 30s, but paginating through
+hundreds of pages legitimately takes longer.
+
+Different method categories MAY benefit from different default timeouts in the future. For now,
+30s is a reasonable default for all methods. The spec intentionally avoids per-method defaults
+to keep the initial implementation simple, but the timeout infrastructure SHOULD support
+per-method overrides in the `MethodDef` struct for future use:
+
+```go
+type MethodDef struct {
+    // ... existing fields ...
+    DefaultTimeout time.Duration // 0 means use global default
+}
+```
+
+The `--timeout` flag MUST be validated: values <= 0 or > 5 minutes MUST be rejected with
+`ExitInputError` (3).
+
+### Large Response Memory Safety
+
+The `--all` flag with no limit could theoretically accumulate millions of records in memory.
+Safeguards:
+
+1. **Hard cap (`--max-results`)**: Default 10,000. Prevents unbounded memory growth. Users who genuinely need more MUST explicitly set `--max-results 0` (unlimited) or a higher value.
+2. **Streaming output (future)**: For v1, results are accumulated in memory and written at the end. A future `--stream` flag SHOULD write NDJSON (newline-delimited JSON) to stdout as each page arrives, keeping memory constant regardless of result count.
+3. **Progress indication**: During `--all` pagination, emit page count and running total to stderr: `"Fetching page 5... (2,500 results so far)"`
+
 ## Out of Scope
 
 - Admin API methods (`admin.*`)
