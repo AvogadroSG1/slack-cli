@@ -18,7 +18,7 @@ A Go CLI (`slack-cli`) that wraps the full Slack Web API (excluding `admin.*` me
 | Code Generation | `go generate` + Go AST introspection | Single toolchain, generates method registry from SDK source |
 | Architecture | Thin dispatch layer + generated method table | Simple generator, generic dispatcher, override escape hatch |
 | Pagination | Single page default, `--all` to auto-paginate | Safe default, explicit opt-in for full data |
-| Errors | Exit 1 + JSON for API errors; exit 2-4 for CLI failures | Agents distinguish API errors from tool failures |
+| Errors | Exit 1 + JSON **to stderr** for API errors; exit 2-4 for CLI failures | Agents distinguish API errors from tool failures; stdout reserved for data only |
 | Scope | All Web API methods except `admin.*` | ~350+ methods across ~28 categories |
 
 ## Architecture
