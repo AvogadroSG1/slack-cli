@@ -545,6 +545,7 @@ on failure. The exit code plus stderr JSON provides the error signal.
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--pretty` | bool | false | Human-readable output instead of JSON |
+| `--output` / `-o` | string | `json` | Output format: `json` (default), `table`, `yaml` (future extensibility) |
 | `--all` | bool | false | Auto-paginate to fetch all results |
 | `--limit` | int | 0 | Max total results when using `--all` (0 = unlimited) |
 | `--cursor` | string | "" | Manual pagination cursor |
@@ -553,6 +554,9 @@ on failure. The exit code plus stderr JSON provides the error signal.
 | `--token` | string | "" | Slack API token (WARNING: visible in process table; prefer `SLACK_TOKEN` env var or stdin pipe) |
 | `--wait-on-rate-limit` | bool | false | Opt-in: sleep and retry when rate limited instead of exiting |
 | `--max-results` | int | 10000 | Hard cap on total results when using `--all` to prevent unbounded memory growth |
+
+> **Note on `--pretty` vs `--output`:** `--pretty` is a shorthand for `--output table`. Both are
+> supported for ergonomics. If both are specified, `--output` takes precedence.
 
 ### 7. Override System (`internal/override/`)
 
