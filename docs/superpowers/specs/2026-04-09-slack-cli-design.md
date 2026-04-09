@@ -763,8 +763,9 @@ func main() {
     // Build command tree
     dispatch.BuildCommands(root, registry.Registry, override.Overrides)
     
-    if err := root.Execute(); err != nil {
-        os.Exit(errors.ExitInputError)
+    // [REVIEW #2] Use ExecuteContext to propagate the cancellable context to all RunE functions.
+    if err := root.ExecuteContext(ctx); err != nil {
+        os.Exit(exitcode.InputError) // [REVIEW #4] exitcode package, not errors
     }
 }
 ```
