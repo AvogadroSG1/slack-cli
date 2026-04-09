@@ -324,6 +324,7 @@ type MethodDef struct {
     CursorResponse  string // JSON path to next_cursor in response
     
     // Request style
+    CallStyle    string // "positional", "struct", "msgoption", "custom-option" (see MsgOption Handling Strategy)
     ReturnsSlice bool   // Whether the primary return is a slice (for --all aggregation)
     ResponseKey  string // JSON key containing the primary data in response
 }
