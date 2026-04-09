@@ -12,7 +12,7 @@ A Go CLI (`slack-cli`) that wraps the full Slack Web API (excluding `admin.*` me
 | SDK | `github.com/slack-go/slack` | Most complete Go Slack library, 411+ methods |
 | CLI Framework | Cobra | Industry standard for Go CLIs, tab completion, nested subcommands |
 | Binary Name | `slack-cli` | Avoids conflicts with Slack desktop app |
-| Auth | `SLACK_TOKEN` env var | 12-factor compliant, simple for agents and CI |
+| Auth | `SLACK_TOKEN` env var (primary), stdin pipe (secondary) | 12-factor compliant, simple for agents and CI; stdin support for secret managers |
 | Output Default | JSON | Agent-first; `--pretty` flag for human-readable tables/text |
 | Subcommand Style | Nested (`slack-cli chat post-message`) | Discoverable, organized, matches `gh`/`aws` conventions |
 | Code Generation | `go generate` + Go AST introspection | Single toolchain, generates method registry from SDK source |
