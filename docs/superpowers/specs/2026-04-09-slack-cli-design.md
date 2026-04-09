@@ -584,6 +584,12 @@ func Register(apiMethod string, cmd *cobra.Command) {
 
 Overrides are registered via `init()` functions. The builder checks the override map before creating a generic command for each method.
 
+**Built-in override commands (not generated from SDK):**
+
+- `api list` -- Lists all available API methods from the registry (see Discoverability section)
+- `version` -- Prints version, commit, and build date
+- `completion` -- Cobra's built-in shell completion generator
+
 ### 8. Entry Point (`cmd/slack-cli/main.go`)
 
 > **Note:** Original spec had duplicate section 7 numbers. Fixed to sequential 7/8.
