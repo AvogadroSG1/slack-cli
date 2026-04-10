@@ -25,5 +25,5 @@ install: build
 clean:
 	rm -rf bin/
 
-e2e:
-	@echo "TODO: end-to-end tests not yet implemented"
+e2e: build
+	go test -tags e2e -v -run TestE2E ./...
