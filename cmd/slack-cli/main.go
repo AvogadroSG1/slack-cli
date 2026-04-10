@@ -9,6 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/poconnor/slack-cli/internal/dispatch"
+	"github.com/poconnor/slack-cli/internal/override"
+	"github.com/poconnor/slack-cli/internal/registry"
+	"github.com/slack-go/slack"
 	"github.com/spf13/cobra"
 )
 
@@ -24,8 +28,18 @@ func main() {
 	defer cancel()
 
 	root := newRootCmd()
+
+	// Create the Slack client only when a token is available. Commands will
+	// report an auth error at invocation time if the client is nil.
+	var client *slack.Client
+	if token := os.Getenv("SLACK_TOKEN"); token != "" {
+		client = slack.New(token)
+	}
+
+	dispatch.BuildCommandsWithClient(root, registry.Registry, override.Overrides, client, os.Stdout)
+
 	if err := root.ExecuteContext(ctx); err != nil {
-		os.Exit(3)
+		os.Exit(dispatch.ExitCode(err))
 	}
 }
 
