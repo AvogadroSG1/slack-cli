@@ -203,6 +203,7 @@ func camelToKebab(s string) string {
 func extractParams(sig *types.Signature, slackPkg *types.Package) ([]paramInfo, string, bool) {
 	params := sig.Params()
 	var result []paramInfo
+	seen := make(map[string]bool)
 	callStyle := "positional"
 	paginated := false
 
@@ -222,11 +223,14 @@ func extractParams(sig *types.Signature, slackPkg *types.Package) ([]paramInfo, 
 				if namedElem, isNamed := slice.Elem().(*types.Named); isNamed {
 					if namedElem.Obj().Name() == "MsgOption" {
 						callStyle = "msgoption"
-						result = append(result, paramInfo{
-							Name:    "options",
-							SDKName: "options",
-							Type:    "json",
-						})
+						if !seen["options"] {
+							result = append(result, paramInfo{
+								Name:    "options",
+								SDKName: "options",
+								Type:    "json",
+							})
+							seen["options"] = true
+						}
 						continue
 					}
 				}
@@ -237,25 +241,30 @@ func extractParams(sig *types.Signature, slackPkg *types.Package) ([]paramInfo, 
 		if structType := extractStructType(pType); structType != nil {
 			callStyle = "struct"
 			fields := extractStructFields(structType)
-			result = append(result, fields...)
-
-			// Check for Cursor field -> paginated.
 			for _, f := range fields {
+				if seen[f.Name] {
+					continue
+				}
+				seen[f.Name] = true
+				result = append(result, f)
 				if f.SDKName == "Cursor" {
 					paginated = true
-					break
 				}
 			}
 			continue
 		}
 
 		// Plain positional parameter.
-		pi := paramInfo{
-			Name:    camelToKebab(pName),
-			SDKName: pName,
-			Type:    goTypeToParamType(pType),
+		kebab := camelToKebab(pName)
+		if !seen[kebab] {
+			seen[kebab] = true
+			pi := paramInfo{
+				Name:    kebab,
+				SDKName: pName,
+				Type:    goTypeToParamType(pType),
+			}
+			result = append(result, pi)
 		}
-		result = append(result, pi)
 	}
 
 	return result, callStyle, paginated
