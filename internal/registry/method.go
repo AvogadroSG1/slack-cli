@@ -1,3 +1,5 @@
+//go:generate go run ../../cmd/introspect
+
 // Package registry defines the method registry types for the Slack CLI.
 // Each MethodDef describes a single Slack API method, including its
 // parameters, pagination behaviour, and SDK calling convention.
