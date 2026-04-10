@@ -16,10 +16,10 @@ type ParamDef struct {
 // MethodDef describes a single Slack API method and the metadata the CLI
 // needs to expose it as a subcommand.
 type MethodDef struct {
-	APIMethod   string   // e.g., "chat.postMessage"
-	Category    string   // e.g., "chat"
-	Command     string   // e.g., "post-message"
-	SDKMethod   string   // e.g., "PostMessageContext" (documentation only)
+	APIMethod   string // e.g., "chat.postMessage"
+	Category    string // e.g., "chat"
+	Command     string // e.g., "post-message"
+	SDKMethod   string // e.g., "PostMessageContext" (documentation only)
 	Description string
 	DocsURL     string
 	Aliases     []string
