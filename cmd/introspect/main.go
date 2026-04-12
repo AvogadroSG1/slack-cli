@@ -47,6 +47,21 @@ type paramInfo struct {
 	Type    string // "string", "int", "bool", "string-slice", "json"
 }
 
+// paramNameOverrides maps SDK parameter/field names to their canonical CLI
+// flag names. The generator applies these before the default camelToKebab
+// conversion so that generated flags match the hand-written dispatch impls
+// and the Slack API docs.
+var paramNameOverrides = map[string]string{
+	"ChannelID":        "channel",
+	"channelID":        "channel",
+	"ChannelName":      "name",
+	"channelName":      "name",
+	"Timestamp":        "ts",
+	"timestamp":        "ts",
+	"messageTimestamp":  "ts",
+	"userID":           "user",
+}
+
 func main() {
 	log.SetPrefix("introspect: ")
 	log.SetFlags(0)
@@ -255,11 +270,16 @@ func extractParams(sig *types.Signature, slackPkg *types.Package) ([]paramInfo, 
 		}
 
 		// Plain positional parameter.
-		kebab := camelToKebab(pName)
-		if !seen[kebab] {
-			seen[kebab] = true
+		flagName := pName
+		if override, ok := paramNameOverrides[pName]; ok {
+			flagName = override
+		} else {
+			flagName = camelToKebab(pName)
+		}
+		if !seen[flagName] {
+			seen[flagName] = true
 			pi := paramInfo{
-				Name:    kebab,
+				Name:    flagName,
 				SDKName: pName,
 				Type:    goTypeToParamType(pType),
 			}
@@ -308,8 +328,14 @@ func extractStructFields(s *types.Struct) []paramInfo {
 		if !f.Exported() {
 			continue
 		}
+		name := f.Name()
+		if override, ok := paramNameOverrides[name]; ok {
+			name = override
+		} else {
+			name = camelToKebab(name)
+		}
 		pi := paramInfo{
-			Name:    camelToKebab(f.Name()),
+			Name:    name,
 			SDKName: f.Name(),
 			Type:    goTypeToParamType(f.Type()),
 		}
