@@ -323,3 +323,18 @@ func TestEnrichOnlyWritesIDToNameMap(t *testing.T) {
 		t.Errorf("id-to-name[U02] = %q, want Jane Smith", idToName["U02"])
 	}
 }
+
+func TestBuildIDToNameMapFallback(t *testing.T) {
+	// When DisplayName is empty, the Slack username key is used as the fallback.
+	people := PeopleCache{
+		"slackbot": {ID: "USLACKBOT", DisplayName: ""},
+		"peter":    {ID: "U01", DisplayName: "Peter O'Connor"},
+	}
+	m := buildIDToNameMap(people)
+	if m["USLACKBOT"] != "slackbot" {
+		t.Errorf("fallback: m[USLACKBOT] = %q, want slackbot", m["USLACKBOT"])
+	}
+	if m["U01"] != "Peter O'Connor" {
+		t.Errorf("display name: m[U01] = %q, want Peter O'Connor", m["U01"])
+	}
+}
