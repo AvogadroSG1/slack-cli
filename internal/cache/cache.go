@@ -233,7 +233,7 @@ func Clear() error {
 	}
 	files := []string{
 		MetaFileName, ChannelsFileName, PeopleFileName,
-		UsergroupsFileName, LockFileName, LegacyFileName,
+		UsergroupsFileName, IDToNameFileName, LockFileName, LegacyFileName,
 	}
 	for _, f := range files {
 		p := filepath.Join(dir, f)
