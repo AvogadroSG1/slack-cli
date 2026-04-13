@@ -193,13 +193,9 @@ func TestLoadIDToNameMap(t *testing.T) {
 }
 
 func TestResolveUserByID(t *testing.T) {
-	withTempCacheDir(t)
 	idToName := map[string]string{
 		"U01POCONNOR": "Peter O'Connor",
 		"U02JSMITH":   "Jane Smith",
-	}
-	if err := SaveEntity(IDToNameFileName, idToName); err != nil {
-		t.Fatal(err)
 	}
 
 	tests := []struct {
@@ -215,6 +211,10 @@ func TestResolveUserByID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			withTempCacheDir(t)
+			if err := SaveEntity(IDToNameFileName, idToName); err != nil {
+				t.Fatal(err)
+			}
 			name, found, err := ResolveUserByID(tt.id)
 			if err != nil {
 				t.Fatalf("ResolveUserByID(%q): %v", tt.id, err)
