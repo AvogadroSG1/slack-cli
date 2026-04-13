@@ -22,7 +22,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/bookmarks.add",
 			CallStyle:   "struct",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "title", SDKName: "Title", Type: "string"},
 				{Name: "type", SDKName: "Type", Type: "string"},
 				{Name: "link", SDKName: "Link", Type: "string"},
@@ -40,7 +40,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/bookmarks.edit",
 			CallStyle:   "struct",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "bookmark-id", SDKName: "bookmarkID", Type: "string"},
 				{Name: "title", SDKName: "Title", Type: "string"},
 				{Name: "emoji", SDKName: "Emoji", Type: "string"},
@@ -56,7 +56,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/bookmarks.list",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 			},
 		},
 		{
@@ -68,7 +68,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/bookmarks.remove",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "bookmark-id", SDKName: "bookmarkID", Type: "string"},
 			},
 		},
@@ -95,7 +95,7 @@ func init() {
 			CallStyle:   "positional",
 			Params: []ParamDef{
 				{Name: "channel", SDKName: "channel", Type: "string"},
-				{Name: "message-timestamp", SDKName: "messageTimestamp", Type: "string"},
+				{Name: "ts", SDKName: "messageTimestamp", Type: "string"},
 			},
 		},
 		{
@@ -120,8 +120,8 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/chat.postEphemeral",
 			CallStyle:   "msgoption",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
-				{Name: "user-id", SDKName: "userID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
+				{Name: "user", SDKName: "userID", Type: "string"},
 				{Name: "options", SDKName: "options", Type: "json"},
 			},
 		},
@@ -134,7 +134,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/chat.postMessage",
 			CallStyle:   "msgoption",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "options", SDKName: "options", Type: "json"},
 			},
 		},
@@ -147,7 +147,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/chat.scheduleMessage",
 			CallStyle:   "msgoption",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "post-at", SDKName: "postAt", Type: "string"},
 				{Name: "options", SDKName: "options", Type: "json"},
 			},
@@ -161,8 +161,8 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/chat.update",
 			CallStyle:   "msgoption",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
-				{Name: "timestamp", SDKName: "timestamp", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
+				{Name: "ts", SDKName: "timestamp", Type: "string"},
 				{Name: "options", SDKName: "options", Type: "json"},
 			},
 		},
@@ -175,7 +175,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.archive",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 			},
 		},
 		{
@@ -187,7 +187,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.close",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 			},
 		},
 		{
@@ -199,7 +199,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.create",
 			CallStyle:   "struct",
 			Params: []ParamDef{
-				{Name: "channel-name", SDKName: "ChannelName", Type: "string"},
+				{Name: "name", SDKName: "ChannelName", Type: "string"},
 				{Name: "is-private", SDKName: "IsPrivate", Type: "bool"},
 				{Name: "team-id", SDKName: "TeamID", Type: "string"},
 			},
@@ -216,7 +216,7 @@ func init() {
 			CursorParam: "cursor",
 			CursorField: "next_cursor",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "ChannelID", Type: "string"},
+				{Name: "channel", SDKName: "ChannelID", Type: "string"},
 				{Name: "cursor", SDKName: "Cursor", Type: "string"},
 				{Name: "inclusive", SDKName: "Inclusive", Type: "bool"},
 				{Name: "latest", SDKName: "Latest", Type: "string"},
@@ -234,7 +234,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.info",
 			CallStyle:   "struct",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "ChannelID", Type: "string"},
+				{Name: "channel", SDKName: "ChannelID", Type: "string"},
 				{Name: "include-locale", SDKName: "IncludeLocale", Type: "bool"},
 				{Name: "include-num-members", SDKName: "IncludeNumMembers", Type: "bool"},
 			},
@@ -248,7 +248,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.invite",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "users", SDKName: "users", Type: "string-slice"},
 			},
 		},
@@ -261,7 +261,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.join",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 			},
 		},
 		{
@@ -273,7 +273,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.kick",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "user", SDKName: "user", Type: "string"},
 			},
 		},
@@ -286,7 +286,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.leave",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 			},
 		},
 		{
@@ -333,7 +333,7 @@ func init() {
 			CursorParam: "cursor",
 			CursorField: "next_cursor",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "ChannelID", Type: "string"},
+				{Name: "channel", SDKName: "ChannelID", Type: "string"},
 				{Name: "cursor", SDKName: "Cursor", Type: "string"},
 				{Name: "limit", SDKName: "Limit", Type: "int"},
 			},
@@ -347,7 +347,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.open",
 			CallStyle:   "struct",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "ChannelID", Type: "string"},
+				{Name: "channel", SDKName: "ChannelID", Type: "string"},
 				{Name: "return-im", SDKName: "ReturnIM", Type: "bool"},
 				{Name: "users", SDKName: "Users", Type: "string-slice"},
 			},
@@ -361,8 +361,8 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.rename",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
-				{Name: "channel-name", SDKName: "channelName", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
+				{Name: "name", SDKName: "channelName", Type: "string"},
 			},
 		},
 		{
@@ -377,8 +377,8 @@ func init() {
 			CursorParam: "cursor",
 			CursorField: "next_cursor",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "ChannelID", Type: "string"},
-				{Name: "timestamp", SDKName: "Timestamp", Type: "string"},
+				{Name: "channel", SDKName: "ChannelID", Type: "string"},
+				{Name: "ts", SDKName: "Timestamp", Type: "string"},
 				{Name: "cursor", SDKName: "Cursor", Type: "string"},
 				{Name: "inclusive", SDKName: "Inclusive", Type: "bool"},
 				{Name: "latest", SDKName: "Latest", Type: "string"},
@@ -396,7 +396,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.setPurpose",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "purpose", SDKName: "purpose", Type: "string"},
 			},
 		},
@@ -409,7 +409,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.setTopic",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "topic", SDKName: "topic", Type: "string"},
 			},
 		},
@@ -422,7 +422,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/conversations.unarchive",
 			CallStyle:   "positional",
 			Params: []ParamDef{
-				{Name: "channel-id", SDKName: "channelID", Type: "string"},
+				{Name: "channel", SDKName: "channelID", Type: "string"},
 			},
 		},
 		{
@@ -588,7 +588,7 @@ func init() {
 			CallStyle:   "struct",
 			Params: []ParamDef{
 				{Name: "channel", SDKName: "channel", Type: "string"},
-				{Name: "timestamp", SDKName: "Timestamp", Type: "string"},
+				{Name: "ts", SDKName: "Timestamp", Type: "string"},
 				{Name: "file", SDKName: "File", Type: "string"},
 				{Name: "comment", SDKName: "Comment", Type: "string"},
 			},
@@ -615,7 +615,7 @@ func init() {
 			CallStyle:   "struct",
 			Params: []ParamDef{
 				{Name: "channel", SDKName: "channel", Type: "string"},
-				{Name: "timestamp", SDKName: "Timestamp", Type: "string"},
+				{Name: "ts", SDKName: "Timestamp", Type: "string"},
 				{Name: "file", SDKName: "File", Type: "string"},
 				{Name: "comment", SDKName: "Comment", Type: "string"},
 			},
@@ -631,7 +631,7 @@ func init() {
 			Params: []ParamDef{
 				{Name: "name", SDKName: "name", Type: "string"},
 				{Name: "channel", SDKName: "Channel", Type: "string"},
-				{Name: "timestamp", SDKName: "Timestamp", Type: "string"},
+				{Name: "ts", SDKName: "Timestamp", Type: "string"},
 				{Name: "file", SDKName: "File", Type: "string"},
 				{Name: "comment", SDKName: "Comment", Type: "string"},
 			},
@@ -646,7 +646,7 @@ func init() {
 			CallStyle:   "struct",
 			Params: []ParamDef{
 				{Name: "channel", SDKName: "Channel", Type: "string"},
-				{Name: "timestamp", SDKName: "Timestamp", Type: "string"},
+				{Name: "ts", SDKName: "Timestamp", Type: "string"},
 				{Name: "file", SDKName: "File", Type: "string"},
 				{Name: "comment", SDKName: "Comment", Type: "string"},
 				{Name: "full", SDKName: "Full", Type: "bool"},
@@ -682,7 +682,7 @@ func init() {
 			Params: []ParamDef{
 				{Name: "name", SDKName: "name", Type: "string"},
 				{Name: "channel", SDKName: "Channel", Type: "string"},
-				{Name: "timestamp", SDKName: "Timestamp", Type: "string"},
+				{Name: "ts", SDKName: "Timestamp", Type: "string"},
 				{Name: "file", SDKName: "File", Type: "string"},
 				{Name: "comment", SDKName: "Comment", Type: "string"},
 			},
@@ -754,7 +754,7 @@ func init() {
 			CallStyle:   "struct",
 			Params: []ParamDef{
 				{Name: "channel", SDKName: "channel", Type: "string"},
-				{Name: "timestamp", SDKName: "Timestamp", Type: "string"},
+				{Name: "ts", SDKName: "Timestamp", Type: "string"},
 				{Name: "file", SDKName: "File", Type: "string"},
 				{Name: "comment", SDKName: "Comment", Type: "string"},
 			},
@@ -787,7 +787,7 @@ func init() {
 			CallStyle:   "struct",
 			Params: []ParamDef{
 				{Name: "channel", SDKName: "channel", Type: "string"},
-				{Name: "timestamp", SDKName: "Timestamp", Type: "string"},
+				{Name: "ts", SDKName: "Timestamp", Type: "string"},
 				{Name: "file", SDKName: "File", Type: "string"},
 				{Name: "comment", SDKName: "Comment", Type: "string"},
 			},
@@ -953,7 +953,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/users.profile.get",
 			CallStyle:   "struct",
 			Params: []ParamDef{
-				{Name: "user-id", SDKName: "UserID", Type: "string"},
+				{Name: "user", SDKName: "UserID", Type: "string"},
 				{Name: "include-labels", SDKName: "IncludeLabels", Type: "bool"},
 			},
 		},
@@ -1000,7 +1000,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/views.publish",
 			CallStyle:   "struct",
 			Params: []ParamDef{
-				{Name: "user-id", SDKName: "UserID", Type: "string"},
+				{Name: "user", SDKName: "UserID", Type: "string"},
 				{Name: "view", SDKName: "View", Type: "json"},
 				{Name: "hash", SDKName: "Hash", Type: "string"},
 			},
