@@ -155,7 +155,7 @@ func TestEnsureReadyVersion1NeedsEnrichment(t *testing.T) {
 	}
 }
 
-func TestEnsureReadyVersion2Fresh(t *testing.T) {
+func TestEnsureReadyCurrentVersionNotStale(t *testing.T) {
 	withTempCacheDir(t)
 
 	if err := SaveEntity(ChannelsFileName, ChannelCache{"general": "C01"}); err != nil {
@@ -170,7 +170,7 @@ func TestEnsureReadyVersion2Fresh(t *testing.T) {
 		t.Fatalf("EnsureReady: %v", err)
 	}
 	if needsWarm {
-		t.Error("expected needsWarm=false for fresh v2 cache")
+		t.Error("expected needsWarm=false for fresh v3 cache")
 	}
 }
 
