@@ -8,13 +8,15 @@ import (
 	"text/tabwriter"
 
 	"github.com/poconnor/slack-cli/internal/registry"
+	"github.com/slack-go/slack"
 	"github.com/spf13/cobra"
 )
 
 // RegisterBuiltins adds built-in commands to root that are not generated from
-// the method registry. Currently this adds the "api list" subcommand for
-// discovering available API methods.
-func RegisterBuiltins(root *cobra.Command) {
+// the method registry. This includes "api list" for discovering available API
+// methods, "cache" for managing the local name-to-ID cache, and "resolve"
+// for looking up Slack IDs by name.
+func RegisterBuiltins(root *cobra.Command, client *slack.Client) {
 	apiCmd := &cobra.Command{
 		Use:   "api",
 		Short: "Discover available Slack API methods",
@@ -22,6 +24,11 @@ func RegisterBuiltins(root *cobra.Command) {
 
 	apiCmd.AddCommand(newListCmd())
 	root.AddCommand(apiCmd)
+
+	root.AddCommand(newCacheCmd(client))
+	root.AddCommand(newResolveCmd(client))
+	root.AddCommand(newThreadReadCmd(client))
+	root.AddCommand(newMessageReadCmd(client))
 }
 
 // methodJSON is the JSON-serialisable representation of a registry method
