@@ -49,7 +49,7 @@ func executeList(t *testing.T, args ...string) string {
 	t.Helper()
 
 	root := &cobra.Command{Use: "slack-cli"}
-	RegisterBuiltins(root)
+	RegisterBuiltins(root, nil)
 
 	var buf bytes.Buffer
 	root.SetOut(&buf)
