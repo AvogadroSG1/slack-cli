@@ -265,7 +265,7 @@ func TestClear(t *testing.T) {
 		t.Fatalf("Clear: %v", err)
 	}
 
-	for _, f := range []string{ChannelsFileName, PeopleFileName, UsergroupsFileName, MetaFileName, LockFileName} {
+	for _, f := range []string{ChannelsFileName, PeopleFileName, UsergroupsFileName, MetaFileName, LockFileName, IDToNameFileName} {
 		p := filepath.Join(dir, f)
 		if _, err := os.Stat(p); !os.IsNotExist(err) {
 			t.Errorf("%s still exists after Clear", f)
