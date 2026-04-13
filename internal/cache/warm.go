@@ -109,6 +109,8 @@ func EnrichOnly(ctx context.Context, fetcher SlackFetcher) error {
 		return fmt.Errorf("enrich usergroups: %w", err)
 	}
 
+	idToName := buildIDToNameMap(people)
+
 	lock, err := AcquireExclusive()
 	if err != nil {
 		return fmt.Errorf("enrich lock: %w", err)
@@ -119,6 +121,9 @@ func EnrichOnly(ctx context.Context, fetcher SlackFetcher) error {
 		return err
 	}
 	if err := SaveEntity(UsergroupsFileName, usergroups); err != nil {
+		return err
+	}
+	if err := SaveEntity(IDToNameFileName, idToName); err != nil {
 		return err
 	}
 	return SaveMeta(CacheMeta{Version: CurrentVersion})
