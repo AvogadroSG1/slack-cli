@@ -194,6 +194,11 @@ func extractFlags(cmd *cobra.Command, params []registry.ParamDef) map[string]any
 	return flags
 }
 
+// ExitCoder is implemented by errors that carry a numeric exit code.
+type ExitCoder interface {
+	ExitCode() int
+}
+
 // exitError wraps an exit code so the root command can extract it.
 type exitError struct {
 	code int
@@ -203,14 +208,24 @@ func (e *exitError) Error() string {
 	return "exit code " + strconv.Itoa(e.code)
 }
 
-// ExitCode returns the numeric exit code from an exitError, or 1 if the error
-// is not an exitError.
+func (e *exitError) ExitCode() int {
+	return e.code
+}
+
+// NewExitError creates an error that carries the given exit code. Use this
+// from command handlers so the root command can extract the code.
+func NewExitError(code int) error {
+	return &exitError{code: code}
+}
+
+// ExitCode returns the numeric exit code from an error that implements
+// ExitCoder, or 1 if the error does not.
 func ExitCode(err error) int {
 	if err == nil {
 		return 0
 	}
-	if ee, ok := err.(*exitError); ok {
-		return ee.code
+	if ec, ok := err.(ExitCoder); ok {
+		return ec.ExitCode()
 	}
 	return 1
 }
