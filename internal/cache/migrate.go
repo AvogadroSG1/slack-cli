@@ -13,7 +13,8 @@ import (
 //   - No meta + no legacy → fresh install, needs full warm (returns needsWarm=true)
 //   - No meta + legacy exists → v1 migration: split files, then enrich
 //   - Meta version 1 → enrichment pass only (channels already split)
-//   - Meta version 2 → current, check staleness
+//   - Meta version 2 → v2→v3 migration: derive id-to-name.json from people.json (no API calls), then staleness check
+//   - Meta version 3 → current, check staleness
 func EnsureReady(ctx context.Context, fetcher SlackFetcher) (needsWarm bool, err error) {
 	version, err := MetaVersion()
 	if err != nil {
