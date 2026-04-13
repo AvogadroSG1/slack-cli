@@ -42,8 +42,8 @@ func parseSlackURL(rawURL string) (channel, ts string, err error) {
 	}
 
 	tsSeg := parts[archivesIdx+2]
-	// Must start with 'p' and have at least 7 chars after stripping 'p' (1 sec digit + 6 frac digits).
-	if len(tsSeg) <= 7 {
+	// Must start with 'p' and have at least 8 chars total (p + at least 7 digits).
+	if len(tsSeg) < 8 || tsSeg[0] != 'p' {
 		return "", "", fmt.Errorf("invalid slack url: timestamp segment too short")
 	}
 
