@@ -42,7 +42,18 @@ func EnsureReady(ctx context.Context, fetcher SlackFetcher) (needsWarm bool, err
 		// Split files exist but not enriched.
 		return enrichAndReturn(ctx, fetcher)
 
-	case CurrentVersion:
+	case 2:
+		// v2→v3: derive id-to-name.json from existing people.json, no API calls.
+		if err := migrateV2toV3(); err != nil {
+			return false, fmt.Errorf("v3 migration: %w", err)
+		}
+		stale, err := IsStale()
+		if err != nil {
+			return false, err
+		}
+		return stale, nil
+
+	case CurrentVersion: // 3
 		// Current version. Check staleness.
 		stale, err := IsStale()
 		if err != nil {
