@@ -296,3 +296,30 @@ func TestEnrichOnly(t *testing.T) {
 		t.Errorf("version = %d, want %d", version, CurrentVersion)
 	}
 }
+
+func TestEnrichOnlyWritesIDToNameMap(t *testing.T) {
+	withTempCacheDir(t)
+
+	if err := SaveEntity(ChannelsFileName, ChannelCache{"general": "C01"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveMeta(CacheMeta{Version: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	fetcher := enrichedMockFetcher()
+	if err := EnrichOnly(context.Background(), fetcher); err != nil {
+		t.Fatalf("EnrichOnly: %v", err)
+	}
+
+	idToName, err := LoadIDToNameMap()
+	if err != nil {
+		t.Fatalf("LoadIDToNameMap after EnrichOnly: %v", err)
+	}
+	if idToName["U01"] != "Peter O'Connor" {
+		t.Errorf("id-to-name[U01] = %q, want Peter O'Connor", idToName["U01"])
+	}
+	if idToName["U02"] != "Jane Smith" {
+		t.Errorf("id-to-name[U02] = %q, want Jane Smith", idToName["U02"])
+	}
+}
