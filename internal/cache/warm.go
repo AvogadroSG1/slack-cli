@@ -47,6 +47,8 @@ func Warm(ctx context.Context, fetcher SlackFetcher) (*WarmResult, error) {
 		return nil, fmt.Errorf("warm usergroups: %w", err)
 	}
 
+	idToName := buildIDToNameMap(people)
+
 	lock, err := AcquireExclusive()
 	if err != nil {
 		return nil, fmt.Errorf("warm lock: %w", err)
@@ -60,6 +62,9 @@ func Warm(ctx context.Context, fetcher SlackFetcher) (*WarmResult, error) {
 		return nil, err
 	}
 	if err := SaveEntity(UsergroupsFileName, usergroups); err != nil {
+		return nil, err
+	}
+	if err := SaveEntity(IDToNameFileName, idToName); err != nil {
 		return nil, err
 	}
 	if err := SaveMeta(CacheMeta{Version: CurrentVersion}); err != nil {
