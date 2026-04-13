@@ -36,7 +36,7 @@ func main() {
 		client = slack.New(token)
 	}
 
-	override.RegisterBuiltins(root)
+	override.RegisterBuiltins(root, client)
 	dispatch.BuildCommandsWithClient(root, registry.Registry, override.Overrides, client, os.Stdout)
 
 	if err := root.ExecuteContext(ctx); err != nil {
