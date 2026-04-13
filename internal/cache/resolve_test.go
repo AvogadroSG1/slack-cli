@@ -3,6 +3,8 @@ package cache
 import (
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestResolveChannel(t *testing.T) {
