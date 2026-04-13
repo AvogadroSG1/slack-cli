@@ -36,7 +36,7 @@ const (
 const StaleDuration = 24 * time.Hour
 
 // Current cache format version.
-const CurrentVersion = 2
+const CurrentVersion = 3
 
 // CacheMeta tracks the cache format version. Staleness is determined by
 // this file's mtime, not the data files.
