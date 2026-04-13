@@ -19,7 +19,8 @@ cmd/introspect/       Code generator: reflects on slack-go SDK → generated reg
 internal/registry/    MethodDef types + generated.go (73 methods, go:generate)
 internal/dispatch/    Command builder, executor, pagination, output formatting
 internal/dispatch/impl_*.go   Per-category dispatch functions (chat, users, files, etc.)
-internal/override/    Hand-written commands replacing generated ones (e.g., api list)
+internal/override/    Hand-written commands: generated overrides + top-level builtins
+internal/cache/       File-based name/ID cache (channels, people, usergroups, id-to-name)
 internal/validate/    Input validation (channel IDs, user IDs, timestamps, JSON)
 internal/exitcode/    Exit code classification from Slack API errors
 ```
@@ -28,7 +29,10 @@ internal/exitcode/    Exit code classification from Slack API errors
 
 - **Code generation**: `cmd/introspect` reflects on `slack-go` types → `internal/registry/generated.go`
 - **Dispatch pipeline**: registry → builder → executor → output (flag extraction, pagination, JSON formatting)
-- **Override mechanism**: hand-written Cobra commands replace generated ones via `override.Register`
+- **Override mechanism**: two kinds of hand-written commands in `internal/override/`:
+  - `override.Register(apiMethod, cmd)` — replaces a generated command for a specific API method
+  - `RegisterBuiltins(root, client)` — adds top-level commands (`cache`, `resolve`, `thread-read`, `message-read`, `api`)
+- **Cache**: file-based store in `~/.slack-cli/` at v3; `id-to-name.json` is a reverse index used by `thread-read`/`message-read` for user ID → display name resolution
 - **Exit codes**: 0=OK, 1=API error, 2=auth error, 3=input error, 4=network error
 - **Auth**: `SLACK_TOKEN` env var required; nil client fails at invocation, not startup
 
