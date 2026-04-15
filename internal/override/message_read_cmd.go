@@ -54,9 +54,7 @@ func runMessageRead(cmd *cobra.Command, client *slack.Client) error {
 		return formatAndExit(cmd, err, exitcode.InputError)
 	}
 
-	if err := ensureCacheReady(cmd, client); err != nil {
-		return err
-	}
+	warnIfCacheNotReady(cmd)
 
 	// Load the full id→name map once; fall back to raw IDs on error.
 	idMap, _ := cache.LoadIDToNameMap()
