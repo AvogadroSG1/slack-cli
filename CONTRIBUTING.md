@@ -233,6 +233,73 @@ During command building, `dispatch.BuildCommandsWithClient` checks the override 
 - You just need to call the SDK differently -- use a dispatch function instead
 - You want different flag names -- update the mapping table instead
 
+## How to Add a Top-Level Builtin Command
+
+Some commands are not overrides of generated API methods at all -- they are new top-level commands that compose multiple API calls or provide high-level UX not representable in the dispatch pipeline. `thread-read`, `message-read`, `cache`, and `resolve` are examples.
+
+**1. Write the Cobra command constructor.**
+
+Create a file in `internal/override/` with a constructor function that accepts `*slack.Client`:
+
+```go
+package override
+
+import (
+    "fmt"
+
+    "github.com/poconnor/slack-cli/internal/exitcode"
+    "github.com/slack-go/slack"
+    "github.com/spf13/cobra"
+)
+
+func newMyCmd(client *slack.Client) *cobra.Command {
+    cmd := &cobra.Command{
+        Use:   "my-cmd",
+        Short: "Does something useful",
+        RunE: func(cmd *cobra.Command, args []string) error {
+            if client == nil {
+                return formatAndExit(cmd, fmt.Errorf("SLACK_TOKEN is not set"), exitcode.AuthError)
+            }
+            // Your implementation
+            return nil
+        },
+    }
+    cmd.Flags().String("channel", "", "Channel ID")
+    return cmd
+}
+```
+
+**2. Register it in `RegisterBuiltins`.**
+
+Add your constructor call in `internal/override/api_list.go`:
+
+```go
+func RegisterBuiltins(root *cobra.Command, client *slack.Client) {
+    // ... existing registrations ...
+    root.AddCommand(newMyCmd(client))
+}
+```
+
+**3. Key conventions for builtin commands:**
+
+- Always check `client == nil` first and return `exitcode.AuthError`
+- Use `formatAndExit(cmd, err, code)` for all error returns -- it writes JSON to stderr and returns a typed exit error
+- Use `ensureCacheReady(cmd, client)` if your command needs name resolution
+- Use `MarkFlagsMutuallyExclusive` and `MarkFlagsRequiredTogether` for flag constraints -- let Cobra enforce them at the framework layer, not in RunE
+- Accept `--url` OR `--channel`+`--ts` for commands that take a message reference (see `thread-read` and `message-read` as the canonical pattern)
+
+**4. Shared helpers in `internal/override/`:**
+
+| Helper | Purpose |
+|--------|---------|
+| `formatAndExit(cmd, err, code)` | Write JSON error to stderr, return exit error |
+| `ensureCacheReady(cmd, client)` | Auto-warm or migrate cache if needed |
+| `parseSlackURL(rawURL)` | Extract channel and timestamp from a Slack URL |
+| `resolveChannelTSFromValues(url, channel, ts)` | Resolve channel+ts from --url or explicit flags |
+| `resolveUser(userID, botID, idMap)` | Resolve user ID to display name with bot detection |
+| `parseSlackTimestamp(ts)` | Convert Slack float timestamp string to time.Time |
+| `formatMessages(msgs, asJSON, w)` | Format []readMessage as plain text or JSON |
+
 ## Testing
 
 ### Conventions

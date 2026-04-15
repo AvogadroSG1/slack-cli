@@ -47,6 +47,20 @@ type paramInfo struct {
 	Type    string // "string", "int", "bool", "string-slice", "json"
 }
 
+// msgOptionParams defines the CLI flags exposed for methods that accept
+// variadic ...MsgOption parameters. These match the named flags read by
+// buildChatMsgOptions in the dispatch layer.
+var msgOptionParams = []paramInfo{
+	{Name: "text", SDKName: "text", Type: "string"},
+	{Name: "thread-ts", SDKName: "threadTimestamp", Type: "string"},
+	{Name: "reply-broadcast", SDKName: "replyBroadcast", Type: "bool"},
+	{Name: "unfurl-links", SDKName: "unfurlLinks", Type: "bool"},
+	{Name: "icon-emoji", SDKName: "iconEmoji", Type: "string"},
+	{Name: "icon-url", SDKName: "iconURL", Type: "string"},
+	{Name: "username", SDKName: "username", Type: "string"},
+	{Name: "blocks", SDKName: "blocks", Type: "json"},
+}
+
 // paramNameOverrides maps SDK parameter/field names to their canonical CLI
 // flag names. The generator applies these before the default camelToKebab
 // conversion so that generated flags match the hand-written dispatch impls
@@ -238,13 +252,11 @@ func extractParams(sig *types.Signature, slackPkg *types.Package) ([]paramInfo, 
 				if namedElem, isNamed := slice.Elem().(*types.Named); isNamed {
 					if namedElem.Obj().Name() == "MsgOption" {
 						callStyle = "msgoption"
-						if !seen["options"] {
-							result = append(result, paramInfo{
-								Name:    "options",
-								SDKName: "options",
-								Type:    "json",
-							})
-							seen["options"] = true
+						for _, mp := range msgOptionParams {
+							if !seen[mp.Name] {
+								seen[mp.Name] = true
+								result = append(result, mp)
+							}
 						}
 						continue
 					}

@@ -122,7 +122,14 @@ func init() {
 			Params: []ParamDef{
 				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "user", SDKName: "userID", Type: "string"},
-				{Name: "options", SDKName: "options", Type: "json"},
+				{Name: "text", SDKName: "text", Type: "string"},
+				{Name: "thread-ts", SDKName: "threadTimestamp", Type: "string"},
+				{Name: "reply-broadcast", SDKName: "replyBroadcast", Type: "bool"},
+				{Name: "unfurl-links", SDKName: "unfurlLinks", Type: "bool"},
+				{Name: "icon-emoji", SDKName: "iconEmoji", Type: "string"},
+				{Name: "icon-url", SDKName: "iconURL", Type: "string"},
+				{Name: "username", SDKName: "username", Type: "string"},
+				{Name: "blocks", SDKName: "blocks", Type: "json"},
 			},
 		},
 		{
@@ -135,7 +142,14 @@ func init() {
 			CallStyle:   "msgoption",
 			Params: []ParamDef{
 				{Name: "channel", SDKName: "channelID", Type: "string"},
-				{Name: "options", SDKName: "options", Type: "json"},
+				{Name: "text", SDKName: "text", Type: "string"},
+				{Name: "thread-ts", SDKName: "threadTimestamp", Type: "string"},
+				{Name: "reply-broadcast", SDKName: "replyBroadcast", Type: "bool"},
+				{Name: "unfurl-links", SDKName: "unfurlLinks", Type: "bool"},
+				{Name: "icon-emoji", SDKName: "iconEmoji", Type: "string"},
+				{Name: "icon-url", SDKName: "iconURL", Type: "string"},
+				{Name: "username", SDKName: "username", Type: "string"},
+				{Name: "blocks", SDKName: "blocks", Type: "json"},
 			},
 		},
 		{
@@ -149,7 +163,14 @@ func init() {
 			Params: []ParamDef{
 				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "post-at", SDKName: "postAt", Type: "string"},
-				{Name: "options", SDKName: "options", Type: "json"},
+				{Name: "text", SDKName: "text", Type: "string"},
+				{Name: "thread-ts", SDKName: "threadTimestamp", Type: "string"},
+				{Name: "reply-broadcast", SDKName: "replyBroadcast", Type: "bool"},
+				{Name: "unfurl-links", SDKName: "unfurlLinks", Type: "bool"},
+				{Name: "icon-emoji", SDKName: "iconEmoji", Type: "string"},
+				{Name: "icon-url", SDKName: "iconURL", Type: "string"},
+				{Name: "username", SDKName: "username", Type: "string"},
+				{Name: "blocks", SDKName: "blocks", Type: "json"},
 			},
 		},
 		{
@@ -163,7 +184,14 @@ func init() {
 			Params: []ParamDef{
 				{Name: "channel", SDKName: "channelID", Type: "string"},
 				{Name: "ts", SDKName: "timestamp", Type: "string"},
-				{Name: "options", SDKName: "options", Type: "json"},
+				{Name: "text", SDKName: "text", Type: "string"},
+				{Name: "thread-ts", SDKName: "threadTimestamp", Type: "string"},
+				{Name: "reply-broadcast", SDKName: "replyBroadcast", Type: "bool"},
+				{Name: "unfurl-links", SDKName: "unfurlLinks", Type: "bool"},
+				{Name: "icon-emoji", SDKName: "iconEmoji", Type: "string"},
+				{Name: "icon-url", SDKName: "iconURL", Type: "string"},
+				{Name: "username", SDKName: "username", Type: "string"},
+				{Name: "blocks", SDKName: "blocks", Type: "json"},
 			},
 		},
 		{
@@ -953,7 +981,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/users.profile.get",
 			CallStyle:   "struct",
 			Params: []ParamDef{
-				{Name: "user", SDKName: "UserID", Type: "string"},
+				{Name: "user-id", SDKName: "UserID", Type: "string"},
 				{Name: "include-labels", SDKName: "IncludeLabels", Type: "bool"},
 			},
 		},
@@ -1000,7 +1028,7 @@ func init() {
 			DocsURL:     "https://api.slack.com/methods/views.publish",
 			CallStyle:   "struct",
 			Params: []ParamDef{
-				{Name: "user", SDKName: "UserID", Type: "string"},
+				{Name: "user-id", SDKName: "UserID", Type: "string"},
 				{Name: "view", SDKName: "View", Type: "json"},
 				{Name: "hash", SDKName: "Hash", Type: "string"},
 			},

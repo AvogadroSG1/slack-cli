@@ -32,7 +32,9 @@ const (
 )
 
 // StaleDuration is how long before the cache is considered stale and
-// triggers an automatic warm on the next resolve.
+// triggers a warning on the next cache-dependent command. Warming is
+// explicit via "slack-cli cache warm". 24 hours was chosen to nudge
+// frequently enough without letting data go silently stale.
 const StaleDuration = 24 * time.Hour
 
 // Current cache format version.
