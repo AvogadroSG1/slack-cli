@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Bash(npm create:*)",
+      "Bash(cp:*)",
+      "Bash(git restore:*)",
+      "Skill(*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": []
+}

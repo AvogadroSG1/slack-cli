@@ -20,7 +20,7 @@ lint:
 	golangci-lint run ./...
 
 install: build
-	cp $(BIN) $(GOPATH)/bin/slack-cli
+	cp $(BIN) ~/.local/bin/slack-cli
 
 clean:
 	rm -rf bin/
