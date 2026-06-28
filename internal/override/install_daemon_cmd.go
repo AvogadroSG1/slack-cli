@@ -89,6 +89,18 @@ func renderPlist(d plistData) (string, error) {
 	return buf.String(), nil
 }
 
+// validateDaemonLabel rejects labels that are not a bare filename stem. The
+// label is joined into the plist path, so a value containing a path separator
+// (or "."/"..") could write the plist outside ~/Library/LaunchAgents.
+func validateDaemonLabel(label string) error {
+	if label == "" || label == "." || label == ".." ||
+		label != filepath.Base(label) ||
+		strings.ContainsRune(label, '/') || strings.ContainsRune(label, '\\') {
+		return fmt.Errorf("--label must be a filename stem with no path separators, got %q", label)
+	}
+	return nil
+}
+
 // plistPath returns the install path ~/Library/LaunchAgents/<label>.plist.
 func plistPath(label string) (string, error) {
 	home, err := os.UserHomeDir()
@@ -161,6 +173,10 @@ func runInstallDaemon(cmd *cobra.Command, _ []string) error {
 	noLoad, _ := cmd.Flags().GetBool("no-load")
 	runAtLoad, _ := cmd.Flags().GetBool("run-at-load")
 
+	if err := validateDaemonLabel(label); err != nil {
+		return formatAndExit(cmd, err, exitcode.InputError)
+	}
+
 	path, err := plistPath(label)
 	if err != nil {
 		return formatAndExit(cmd, err, exitcode.NetError)
@@ -172,12 +188,13 @@ func runInstallDaemon(cmd *cobra.Command, _ []string) error {
 			exitcode.InputError)
 	}
 
+	// Use the executable path as-is (do not resolve symlinks). Package managers
+	// like Homebrew expose a stable symlink (e.g. /usr/local/bin/slack-cli) that
+	// is repointed on upgrade; resolving it would pin the plist to a versioned
+	// path that breaks after the next upgrade.
 	exe, err := os.Executable()
 	if err != nil {
 		return formatAndExit(cmd, err, exitcode.NetError)
-	}
-	if resolved, rErr := filepath.EvalSymlinks(exe); rErr == nil {
-		exe = resolved
 	}
 
 	outLog, errLog, err := logPaths()
@@ -213,13 +230,13 @@ func runInstallDaemon(cmd *cobra.Command, _ []string) error {
 	fmt.Fprintln(w, "  runs \"cache warm\" at :00 every hour")
 
 	if noLoad {
-		fmt.Fprintf(w, "Not loaded (--no-load). Load it with: launchctl load -w %s\n", path)
+		fmt.Fprintf(w, "Not loaded (--no-load). Load it with: launchctl load -w %q\n", path)
 		return nil
 	}
 
 	if err := loadLaunchd(cmd.Context(), path); err != nil {
 		return formatAndExit(cmd,
-			fmt.Errorf("plist written to %s but loading failed (load manually with \"launchctl load -w %s\"): %w", path, path, err),
+			fmt.Errorf("plist written to %s but loading failed (load manually with: launchctl load -w %q): %w", path, path, err),
 			exitcode.NetError)
 	}
 	fmt.Fprintln(w, "Loaded and active.")

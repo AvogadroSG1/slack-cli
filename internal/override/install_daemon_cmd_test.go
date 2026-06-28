@@ -154,4 +154,36 @@ func TestInstallDaemonNonDarwin(t *testing.T) {
 	if !strings.Contains(errBuf.String(), "macOS") {
 		t.Errorf("stderr missing 'macOS': %s", errBuf.String())
 	}
+	// The non-darwin guard must map to InputError (exit code 3); assert the
+	// formatted JSON error carries it so a regression is caught.
+	if !strings.Contains(errBuf.String(), `"exit_code": 3`) {
+		t.Errorf("stderr missing exit_code 3: %s", errBuf.String())
+	}
+}
+
+func TestValidateDaemonLabel(t *testing.T) {
+	tests := []struct {
+		name    string
+		label   string
+		wantErr bool
+	}{
+		{"valid stem", "com.slack-cli.prime", false},
+		{"valid simple", "mydaemon", false},
+		{"empty", "", true},
+		{"dot", ".", true},
+		{"dotdot", "..", true},
+		{"relative traversal", "../evil", true},
+		{"absolute", "/etc/passwd", true},
+		{"nested", "a/b", true},
+		{"backslash", `a\b`, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateDaemonLabel(tt.label)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateDaemonLabel(%q) error = %v, wantErr %v", tt.label, err, tt.wantErr)
+			}
+		})
+	}
 }
