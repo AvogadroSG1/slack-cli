@@ -111,9 +111,23 @@ func TestFetchThreadMaximumResultSemantics(t *testing.T) {
 			wantCount: 3, wantComplete: true, wantLimits: []int{2, 1},
 		},
 		{
-			name: "zero limit uses remaining capacity", options: threadFetchOptions{MaxResults: 3},
+			name: "zero limit uses conservative default", options: threadFetchOptions{MaxResults: 100},
+			pages:     []fakeThreadPage{{messages: []slack.Message{slackMessage("1784131538.270229")}}},
+			wantCount: 1, wantComplete: true, wantLimits: []int{15},
+		},
+		{
+			name: "zero limit shrinks to remaining capacity", options: threadFetchOptions{MaxResults: 3},
 			pages:     []fakeThreadPage{{messages: []slack.Message{slackMessage("1784131538.270229")}}},
 			wantCount: 1, wantComplete: true, wantLimits: []int{3},
+		},
+		{
+			name:    "zero limit with unlimited maximum uses conservative default",
+			options: threadFetchOptions{},
+			pages: []fakeThreadPage{
+				{messages: []slack.Message{slackMessage("1784131538.270229")}, nextCursor: "next"},
+				{messages: []slack.Message{slackMessage("1784131630.101010")}},
+			},
+			wantCount: 2, wantComplete: true, wantLimits: []int{15, 15},
 		},
 		{
 			name: "zero maximum is unlimited", options: threadFetchOptions{Limit: 2},

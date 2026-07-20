@@ -124,6 +124,9 @@ func TestValidateThreadFilters(t *testing.T) {
 	}{
 		{name: "defaults"},
 		{name: "range", oldest: "1784131538.270229", latest: "1784131630.101010", limit: 20, maxResults: 100},
+		{name: "largest valid page", limit: 999},
+		{name: "Slack cursor limit boundary", limit: 1000, wantErr: "between 0 and 999"},
+		{name: "above Slack cursor limit", limit: 1500, wantErr: "between 0 and 999"},
 		{name: "negative limit", limit: -1, wantErr: "limit"},
 		{name: "negative maximum", maxResults: -1, wantErr: "max-results"},
 		{name: "invalid oldest", oldest: "yesterday", wantErr: "oldest"},

@@ -120,8 +120,8 @@ func singleQueryValue(values url.Values, key string) (string, bool, error) {
 }
 
 func validateThreadFilters(oldest, latest string, limit, maxResults int) error {
-	if limit < 0 {
-		return fmt.Errorf("--limit must be zero or greater")
+	if limit < 0 || limit >= 1000 {
+		return fmt.Errorf("--limit must be between 0 and 999")
 	}
 	if maxResults < 0 {
 		return fmt.Errorf("--max-results must be zero or greater")

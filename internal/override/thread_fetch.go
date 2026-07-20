@@ -10,7 +10,10 @@ import (
 	"github.com/slack-go/slack"
 )
 
-const maxConsecutiveRateLimitRetries = 3
+const (
+	defaultThreadPageLimit         = 15
+	maxConsecutiveRateLimitRetries = 3
+)
 
 var errRepeatedThreadCursor = errors.New("repeated thread pagination cursor")
 
@@ -113,14 +116,18 @@ func fetchThreadPage(
 }
 
 func threadPageLimit(limit, maxResults, selected int) int {
+	effective := limit
+	if effective == 0 {
+		effective = defaultThreadPageLimit
+	}
 	if maxResults == 0 {
-		return limit
+		return effective
 	}
 	remaining := maxResults - selected
-	if limit == 0 || remaining < limit {
+	if remaining < effective {
 		return remaining
 	}
-	return limit
+	return effective
 }
 
 func sortedThreadMessages(unique map[string]slack.Message) []slack.Message {
