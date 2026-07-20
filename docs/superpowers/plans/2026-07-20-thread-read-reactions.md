@@ -2596,4 +2596,4 @@ Because unrelated untracked local artifacts exist, use the `git-pushing` skill's
 | README, skill, contributor docs, help, ADR, spec, Obsidian | Task 5 |
 | `make test`, `make lint`, build, live smoke | Tasks 6 and 9 |
 
-*Authored By Peter O'Connor with Assistance from Codex (GPT-5) · 2026-07-20 · slack-cli exhaustive thread-read implementation plan*
+*Authored By Peter O'Connor with Assistance from Claude Code (GPT-5) · 2026-07-20 · slack-cli exhaustive thread-read implementation plan*
