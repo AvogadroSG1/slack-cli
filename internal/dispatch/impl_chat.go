@@ -27,10 +27,6 @@ func buildChatMsgOptions(flags map[string]any) ([]slack.MsgOption, error) {
 	if flagBool(flags, "unfurl-links") {
 		opts = append(opts, slack.MsgOptionEnableLinkUnfurl())
 	}
-	if flagBool(flags, "unfurl-media") {
-		// SDK only exposes a disable toggle; skip when the flag is true
-		// because link unfurl is enabled by default.
-	}
 	if emoji := flagStr(flags, "icon-emoji"); emoji != "" {
 		opts = append(opts, slack.MsgOptionIconEmoji(emoji))
 	}

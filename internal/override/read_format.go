@@ -9,8 +9,7 @@ import (
 	"time"
 )
 
-// readMessage is the normalised representation of a single Slack message
-// used by both thread-read and message-read formatters.
+// readMessage is the normalised representation used by the message-read formatter.
 type readMessage struct {
 	User string    // display name, "[bot]", or raw Slack user ID
 	Time time.Time // from time.Unix (UTC); formatter applies local timezone
