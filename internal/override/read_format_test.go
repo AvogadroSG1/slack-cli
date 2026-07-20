@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 // errWriter always fails writes — used to test error propagation.
@@ -92,6 +94,44 @@ func TestFormatMessagesWriteError(t *testing.T) {
 	}
 	if err := formatMessages(msgs, true, &errWriter{}); err == nil {
 		t.Fatal("expected write error to propagate in JSON mode")
+	}
+}
+
+func TestMessageReadFormatterCompatibilitySnapshot(t *testing.T) {
+	location := time.FixedZone("EDT", -4*60*60)
+	previousLocation := time.Local
+	time.Local = location
+	t.Cleanup(func() { time.Local = previousLocation })
+	messages := []readMessage{{
+		User: "Peter O'Connor",
+		Time: time.Date(2026, 7, 15, 13, 5, 38, 0, location),
+		Text: "The deployment is complete.",
+	}}
+
+	var human bytes.Buffer
+	if err := formatMessages(messages, false, &human); err != nil {
+		t.Fatalf("formatMessages(human) error = %v", err)
+	}
+	wantHuman := "Peter O'Connor [2026-07-15 13:05]: The deployment is complete.\n"
+	if human.String() != wantHuman {
+		t.Errorf("human output = %q, want %q", human.String(), wantHuman)
+	}
+
+	var encoded bytes.Buffer
+	if err := formatMessages(messages, true, &encoded); err != nil {
+		t.Fatalf("formatMessages(JSON) error = %v", err)
+	}
+	var got []map[string]any
+	if err := json.Unmarshal(encoded.Bytes(), &got); err != nil {
+		t.Fatalf("JSON output = %q: %v", encoded.String(), err)
+	}
+	wantJSON := []map[string]any{{
+		"user": "Peter O'Connor",
+		"ts":   "2026-07-15T13:05:38-04:00",
+		"text": "The deployment is complete.",
+	}}
+	if diff := cmp.Diff(wantJSON, got); diff != "" {
+		t.Errorf("message-read JSON changed (-want +got):\n%s", diff)
 	}
 }
 
