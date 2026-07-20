@@ -93,11 +93,11 @@ slack-cli users info --user U01ABCDEF --pretty
 |------|---------|-------------|
 | `--pretty` | false | Pretty-print output |
 | `--all` | false | Fetch all pages automatically (`thread-read` is already exhaustive) |
-| `--limit` | 0 | Items per API request (0 = API default) |
+| `--limit` | 0 | Items per API request (`thread-read`: `0` uses `15`; other commands: API default) |
 | `--cursor` | "" | Pagination cursor |
 | `--timeout` | 30s | HTTP timeout |
 | `--debug` | false | Debug logging to stderr |
-| `--max-results` | 10000 | Maximum total results during exhaustive retrieval (0 is unlimited) |
+| `--max-results` | 10000 | Maximum total results during exhaustive retrieval (`thread-read`: `0` is unlimited) |
 | `--wait-on-rate-limit` | false | Retry on rate limit |
 
 ## Exit Codes
@@ -211,7 +211,7 @@ slack-cli thread-read "https://stackexchange.slack.com/archives/C09M260TY7Q/p178
 
 Each JSON message always has `user`, RFC3339 `ts`, exact `slack_ts`, `text`, and a `reactions` array. `--include-all-metadata` adds `metadata` only when Slack returned it. Reactor identities, attachments, files, blocks, unfurls, and summaries are intentionally excluded.
 
-Retrieval is exhaustive by default. `--limit` sets Slack's page size; `--max-results` caps unique returned messages (`0` means unlimited); `--cursor` resumes; and `--oldest`, `--latest`, plus `--inclusive` narrow the requested window. A cap with more pages exits 0, writes the messages to stdout, and writes a resumable incomplete-result status to stderr. Use `--wait-on-rate-limit` to wait for `Retry-After` with cancellable bounded retries.
+Retrieval is exhaustive by default. For `thread-read`, `--limit=0` selects 15, explicit limits MUST be 1 through 999, and finite remaining `--max-results` capacity shrinks the next request. `--max-results` caps unique returned messages (`0` means unlimited for `thread-read`); `--cursor` resumes; and `--oldest`, `--latest`, plus `--inclusive` narrow the requested window. A cap with more pages exits 0, writes the messages to stdout, and writes a resumable incomplete-result status to stderr. Use `--wait-on-rate-limit` to wait for `Retry-After` with cancellable bounded retries.
 
 **Human output:**
 

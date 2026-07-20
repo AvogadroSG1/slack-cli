@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -44,8 +45,8 @@ func executeThreadRead(
 
 func successfulThreadDependencies(client threadClient) threadReadDependencies {
 	return threadReadDependencies{
-		client:    client,
-		warnCache: func(*cobra.Command) {},
+		client:       client,
+		prepareCache: func(*cobra.Command, bool) {},
 		loadIDToNameMap: func() (map[string]string, error) {
 			return map[string]string{"U09PETER01": "Peter O'Connor"}, nil
 		},
@@ -190,6 +191,44 @@ func TestThreadReadJSONTakesPrecedenceAndReportsIncompleteResult(t *testing.T) {
 	}
 }
 
+func TestThreadReadJSONSuppressesPlaintextCacheWarning(t *testing.T) {
+	client := &fakeThreadClient{pages: []fakeThreadPage{{
+		messages:   []slack.Message{slackMessage("1784131538.270229")},
+		nextCursor: "resume-cursor",
+	}}}
+	dependencies := successfulThreadDependencies(client)
+	preparations := 0
+	dependencies.prepareCache = func(cmd *cobra.Command, warnings bool) {
+		preparations++
+		if warnings {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Warning: cache not warmed")
+		}
+	}
+	stdout, stderr, err := executeThreadRead(
+		t,
+		dependencies,
+		"https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229",
+		"--json", "--max-results", "1",
+	)
+	if err != nil {
+		t.Fatalf("error = %v", err)
+	}
+	if preparations != 1 {
+		t.Errorf("cache preparations = %d, want 1", preparations)
+	}
+	var messages []map[string]any
+	if err := json.Unmarshal([]byte(stdout), &messages); err != nil {
+		t.Fatalf("stdout = %q: %v", stdout, err)
+	}
+	var status threadIncompleteStatus
+	if err := json.Unmarshal([]byte(stderr), &status); err != nil {
+		t.Fatalf("stderr = %q, want one JSON status object: %v", stderr, err)
+	}
+	if status.NextCursor != "resume-cursor" {
+		t.Errorf("next cursor = %q, want resume-cursor", status.NextCursor)
+	}
+}
+
 func TestThreadReadHumanReportsIncompleteResult(t *testing.T) {
 	client := &fakeThreadClient{pages: []fakeThreadPage{{
 		messages:   []slack.Message{slackMessage("1784131538.270229")},
@@ -278,7 +317,11 @@ func TestThreadReadLoadsCacheOnce(t *testing.T) {
 	dependencies := successfulThreadDependencies(client)
 	loads := 0
 	readinessChecks := 0
-	dependencies.warnCache = func(*cobra.Command) { readinessChecks++ }
+	var warningModes []bool
+	dependencies.prepareCache = func(_ *cobra.Command, warnings bool) {
+		readinessChecks++
+		warningModes = append(warningModes, warnings)
+	}
 	dependencies.loadIDToNameMap = func() (map[string]string, error) {
 		loads++
 		return nil, errors.New("cache unavailable")
@@ -293,6 +336,9 @@ func TestThreadReadLoadsCacheOnce(t *testing.T) {
 	}
 	if loads != 1 || readinessChecks != 1 {
 		t.Errorf("cache loads/readiness checks = %d/%d, want 1/1", loads, readinessChecks)
+	}
+	if len(warningModes) != 1 || !warningModes[0] {
+		t.Errorf("cache warning modes = %v, want [true]", warningModes)
 	}
 }
 

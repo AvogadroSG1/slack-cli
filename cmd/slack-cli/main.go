@@ -57,12 +57,12 @@ func newRootCmd() *cobra.Command {
 	pf := root.PersistentFlags()
 	pf.Bool("pretty", false, "Use human-readable output when available; otherwise pretty-print JSON")
 	pf.Bool("all", false, "Fetch all pages automatically (thread-read is already exhaustive)")
-	pf.Int("limit", 0, "Maximum items per API request (0 uses API default)")
+	pf.Int("limit", 0, "Maximum items per API request (thread-read: 0 uses 15; other commands: API default)")
 	pf.String("cursor", "", "Pagination cursor for resuming a previous request")
 	pf.Duration("timeout", 30*time.Second, "HTTP timeout for API calls")
 	pf.Bool("debug", false, "Enable debug logging to stderr")
 	pf.Bool("wait-on-rate-limit", false, "Wait and retry when rate-limited instead of failing")
-	pf.Int("max-results", 10000, "Maximum total results during exhaustive retrieval (0 is unlimited)")
+	pf.Int("max-results", 10000, "Maximum total results during exhaustive retrieval (thread-read: 0 is unlimited)")
 
 	root.AddCommand(newVersionCmd())
 

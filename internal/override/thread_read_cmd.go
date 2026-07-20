@@ -12,7 +12,7 @@ import (
 
 type threadReadDependencies struct {
 	client          threadClient
-	warnCache       func(*cobra.Command)
+	prepareCache    func(*cobra.Command, bool)
 	loadIDToNameMap func() (map[string]string, error)
 	wait            threadWaitFunc
 }
@@ -24,7 +24,7 @@ func newThreadReadCmd(client *slack.Client) *cobra.Command {
 	}
 	return newThreadReadCmdWithDependencies(threadReadDependencies{
 		client:          threadAPI,
-		warnCache:       warnIfCacheNotReady,
+		prepareCache:    prepareCache,
 		loadIDToNameMap: cache.LoadIDToNameMap,
 		wait:            waitForRetry,
 	})
@@ -86,11 +86,12 @@ func runThreadRead(
 	); err != nil {
 		return formatAndExit(cmd, err, exitcode.InputError)
 	}
+	asJSON, _ := cmd.Flags().GetBool("json")
 
 	if dependencies.client == nil {
 		return formatAndExit(cmd, fmt.Errorf("SLACK_TOKEN is not set"), exitcode.AuthError)
 	}
-	dependencies.warnCache(cmd)
+	dependencies.prepareCache(cmd, !asJSON)
 	idMap, _ := dependencies.loadIDToNameMap()
 	if idMap == nil {
 		idMap = map[string]string{}
@@ -114,7 +115,6 @@ func runThreadRead(
 		)
 	}
 
-	asJSON, _ := cmd.Flags().GetBool("json")
 	messages := normalizeThreadMessages(result.Messages, idMap, options.IncludeAllMetadata)
 	if err := formatThreadMessages(messages, asJSON, cmd.OutOrStdout()); err != nil {
 		return formatAndExit(cmd, err, exitcode.NetError)

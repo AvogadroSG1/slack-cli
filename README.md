@@ -190,7 +190,7 @@ Peter O'Connor [2026-07-15 13:05]: The deployment is complete.
 
 Use `--json` for a stable top-level message array. Every object contains `user`, `ts`, `slack_ts`, `text`, and `reactions`; `metadata` is added only with `--include-all-metadata` and only when Slack returned it.
 
-`--limit` controls each Slack API page. `--max-results` controls total unique messages and defaults to `10000`; `0` is unlimited. If a cap stops retrieval while another cursor exists, stdout still contains the selected messages, stderr identifies the result as incomplete, and `--cursor` resumes the same filtered window. `--oldest`, `--latest`, and `--inclusive` narrow that window. `--all` is accepted but unnecessary because `thread-read` is exhaustive by default.
+`--limit` controls each Slack API page. For `thread-read`, `--limit=0` selects 15, and explicit limits MUST be 1 through 999. When finite `--max-results` capacity is smaller than the requested page size, `thread-read` shrinks the next request to the remaining capacity. `--max-results` controls total unique messages and defaults to `10000`; for `thread-read`, `0` is unlimited. If a cap stops retrieval while another cursor exists, stdout still contains the selected messages, stderr identifies the result as incomplete, and `--cursor` resumes the same filtered window. `--oldest`, `--latest`, and `--inclusive` narrow that window. `--all` is accepted but unnecessary because `thread-read` is exhaustive by default.
 
 ### Global Flags
 
@@ -200,11 +200,11 @@ These flags are available on every command:
 |------|------|---------|-------------|
 | `--pretty` | bool | `false` | Pretty-print output (tables for maps, indented JSON for lists) |
 | `--all` | bool | `false` | Fetch all pages automatically; `thread-read` is exhaustive without `--all` and still honors `--max-results` |
-| `--limit` | int | `0` | Maximum items per API request (0 uses API default) |
+| `--limit` | int | `0` | Maximum items per API request (`thread-read`: `0` uses `15`; other commands: API default) |
 | `--cursor` | string | `""` | Pagination cursor for resuming a previous request |
 | `--timeout` | duration | `30s` | HTTP timeout for API calls |
 | `--debug` | bool | `false` | Enable debug logging to stderr |
-| `--max-results` | int | `10000` | Maximum total results during exhaustive retrieval (`0` is unlimited); `thread-read` honors it without `--all` |
+| `--max-results` | int | `10000` | Maximum total results during exhaustive retrieval (`thread-read`: `0` is unlimited); `thread-read` honors it without `--all` |
 | `--wait-on-rate-limit` | bool | `false` | Wait and retry when rate-limited instead of failing |
 
 ### Pagination

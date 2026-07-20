@@ -282,10 +282,10 @@ func RegisterBuiltins(root *cobra.Command, client *slack.Client) {
 
 **3. Key conventions for builtin commands:**
 
-- Always check `client == nil` first and return `exitcode.AuthError`
+- Validate semantic input before checking `client == nil` when the command contract gives malformed input precedence over missing authentication; otherwise check the client first
 - Use `formatAndExit(cmd, err, code)` for all error returns -- it writes JSON to stderr and returns a typed exit error
-- Use `warnIfCacheNotReady(cmd)` before loading the local name cache; it performs local-only migrations and warns when an explicit `slack-cli cache warm` is needed
-- Use `MarkFlagsMutuallyExclusive` and `MarkFlagsRequiredTogether` for flag constraints -- let Cobra enforce them at the framework layer, not in RunE
+- Use `prepareCache(cmd, !asJSON)` when a JSON semantic command MUST run local cache preparation without mixing a plain-text warning into structured stderr; existing human-oriented commands use `warnIfCacheNotReady(cmd)`
+- Use `MarkFlagsMutuallyExclusive` and `MarkFlagsRequiredTogether` for simple flag-only relationships; validate positional-versus-flag modes and other mixed semantic constraints in `RunE`
 - Keep semantic builtins isolated from generated commands. `thread-read` owns exhaustive thread retrieval; `message-read` owns one top-level message; `conversations replies` remains the generic one-call Slack API surface.
 - Use `parseThreadPermalink` and `resolveThreadReference` for `thread-read`. They accept parent and reply permalinks, prefer `thread_ts`, and validate `cid`. Do not reuse this behavior in `message-read` because doing so would change its established target and JSON schema.
 - Put thread pagination in `thread_fetch.go`; do not route it through `internal/dispatch.Paginate`, whose `--limit` semantics are intentionally generic and different.
@@ -297,6 +297,7 @@ func RegisterBuiltins(root *cobra.Command, client *slack.Client) {
 | Helper or file | Purpose |
 |---|---|
 | `formatAndExit(cmd, err, code)` | Write JSON error to stderr, return exit error |
+| `prepareCache(cmd, warnings)` | Run local cache preparation with optional warning emission. |
 | `warnIfCacheNotReady(cmd)` | Run local-only cache migrations and warn when an explicit warm is needed. |
 | `parseSlackURL(rawURL)` | `message-read` compatibility helper: extract channel and timestamp from a Slack URL. |
 | `resolveChannelTSFromValues(url, channel, ts)` | `message-read` compatibility helper: resolve channel and timestamp from `--url` or explicit flags. |
