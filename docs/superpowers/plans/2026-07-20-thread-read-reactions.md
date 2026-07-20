@@ -2482,7 +2482,7 @@ The specification reviewer MUST verify input-error precedence, JSON diagnostic v
 ### Task 9: Re-prove the complete acceptance and publication bar
 
 **Files:**
-- Verify every tracked file changed since `9247e87`
+- Verify every tracked file changed relative to `all/main`
 - Verify artifact: `bin/slack-cli`
 - Verify mirrors: design, ADR, and implementation plan under `/Users/poconnor/ObsidianNotes/Work/drafts/`
 
@@ -2520,8 +2520,8 @@ Expected: all focused scenarios PASS; thread help describes 15 and thread-specif
 Run:
 
 ```bash
-rtk git diff 9247e87 -- internal/override/slack_url.go internal/override/message_read_cmd.go internal/dispatch/pagination.go internal/dispatch/impl_conversations.go internal/registry/generated.go
-rtk git diff 9247e87 -- internal/override/read_format.go
+rtk git diff all/main..HEAD -- internal/override/slack_url.go internal/override/message_read_cmd.go internal/dispatch/pagination.go internal/dispatch/impl_conversations.go internal/registry/generated.go
+rtk git diff all/main..HEAD -- internal/override/read_format.go
 rtk go test -race -count=1 ./internal/override -run 'Test(MessageRead|MessageReadFormatter)' -v
 ```
 
@@ -2538,7 +2538,7 @@ rtk shasum -a 256 docs/superpowers/plans/2026-07-20-thread-read-reactions.md /Us
 rtk tail -n 1 /Users/poconnor/ObsidianNotes/Work/drafts/2026-07-20-thread-read-reactions-design.md
 rtk tail -n 1 /Users/poconnor/ObsidianNotes/Work/drafts/0001-exhaustive-thread-read.md
 rtk tail -n 1 /Users/poconnor/ObsidianNotes/Work/drafts/2026-07-20-thread-read-reactions-implementation-plan.md
-rtk git log 2df6e24..HEAD --format=full
+rtk git log all/main..HEAD --format=full
 ```
 
 Expected: each source/draft pair has matching hashes and the required footer; every authored commit contains both mandated co-author trailers.
@@ -2559,9 +2559,9 @@ Run:
 
 ```bash
 rtk git status --short --branch
-rtk git diff --stat 2df6e24..HEAD
-rtk git diff --check 2df6e24..HEAD
-rtk git diff --name-only 2df6e24..HEAD
+rtk git diff --stat all/main..HEAD
+rtk git diff --check all/main..HEAD
+rtk git diff --name-only all/main..HEAD
 ```
 
 Expected: only intended feature, test, documentation, plan, ADR, and reviewed lint-baseline files are tracked; no token, cache content, binary, or unrelated `.agents`, `.claude`, `apm.yml`, or `apm.lock.yaml` artifact is included.
