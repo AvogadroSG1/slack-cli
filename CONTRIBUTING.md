@@ -284,21 +284,29 @@ func RegisterBuiltins(root *cobra.Command, client *slack.Client) {
 
 - Always check `client == nil` first and return `exitcode.AuthError`
 - Use `formatAndExit(cmd, err, code)` for all error returns -- it writes JSON to stderr and returns a typed exit error
-- Use `ensureCacheReady(cmd, client)` if your command needs name resolution
+- Use `warnIfCacheNotReady(cmd)` before loading the local name cache; it performs local-only migrations and warns when an explicit `slack-cli cache warm` is needed
 - Use `MarkFlagsMutuallyExclusive` and `MarkFlagsRequiredTogether` for flag constraints -- let Cobra enforce them at the framework layer, not in RunE
-- Accept `--url` OR `--channel`+`--ts` for commands that take a message reference (see `thread-read` and `message-read` as the canonical pattern)
+- Keep semantic builtins isolated from generated commands. `thread-read` owns exhaustive thread retrieval; `message-read` owns one top-level message; `conversations replies` remains the generic one-call Slack API surface.
+- Use `parseThreadPermalink` and `resolveThreadReference` for `thread-read`. They accept parent and reply permalinks, prefer `thread_ts`, and validate `cid`. Do not reuse this behavior in `message-read` because doing so would change its established target and JSON schema.
+- Put thread pagination in `thread_fetch.go`; do not route it through `internal/dispatch.Paginate`, whose `--limit` semantics are intentionally generic and different.
+- Put reaction and metadata output in `thread_format.go`; do not add thread fields to `readMessage` or `formatMessages`, which are the `message-read` compatibility boundary.
+- Test semantic commands through injected consuming-package interfaces. BDD scenarios MUST cover input conflicts, multi-page retrieval, repeated cursors, page-boundary deduplication, exact caps, rate limits, cancellation, no-partial-output failures, stable output snapshots, and exit codes.
 
 **4. Shared helpers in `internal/override/`:**
 
-| Helper | Purpose |
-|--------|---------|
+| Helper or file | Purpose |
+|---|---|
 | `formatAndExit(cmd, err, code)` | Write JSON error to stderr, return exit error |
-| `ensureCacheReady(cmd, client)` | Auto-warm or migrate cache if needed |
-| `parseSlackURL(rawURL)` | Extract channel and timestamp from a Slack URL |
-| `resolveChannelTSFromValues(url, channel, ts)` | Resolve channel+ts from --url or explicit flags |
+| `warnIfCacheNotReady(cmd)` | Run local-only cache migrations and warn when an explicit warm is needed. |
+| `parseSlackURL(rawURL)` | `message-read` compatibility helper: extract channel and timestamp from a Slack URL. |
+| `resolveChannelTSFromValues(url, channel, ts)` | `message-read` compatibility helper: resolve channel and timestamp from `--url` or explicit flags. |
 | `resolveUser(userID, botID, idMap)` | Resolve user ID to display name with bot detection |
 | `parseSlackTimestamp(ts)` | Convert Slack float timestamp string to time.Time |
-| `formatMessages(msgs, asJSON, w)` | Format []readMessage as plain text or JSON |
+| `readMessage` | `message-read` compatibility helper: preserve the established normalized message schema. |
+| `formatMessages(msgs, asJSON, w)` | `message-read` compatibility helper: render `readMessage` values as plain text or JSON. |
+| `thread_reference.go` | Parse parent/reply permalinks and validate one thread input mode. |
+| `thread_fetch.go` | Retrieve, deduplicate, order, cap, and retry semantic thread pages. |
+| `thread_format.go` | Normalize and render reactions, exact timestamps, and optional metadata without changing `message-read`. |
 
 ## Testing
 

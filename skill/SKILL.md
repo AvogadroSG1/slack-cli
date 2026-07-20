@@ -49,7 +49,7 @@ slack-cli search messages --query "deploy failed"
 
 | Task | Command |
 |------|---------|
-| **Read a full thread (human-readable)** | `slack-cli thread-read --url "https://...slack.com/archives/CXXX/pYYY"` |
+| **Read a full thread (human-readable)** | `slack-cli thread-read "https://...slack.com/archives/CXXX/pYYY"` |
 | **Read a single message (human-readable)** | `slack-cli message-read --url "https://...slack.com/archives/CXXX/pYYY"` |
 | Resolve channel name to ID | `slack-cli resolve channel general` |
 | Resolve user name to ID | `slack-cli resolve user poconnor` |
@@ -92,12 +92,12 @@ slack-cli users info --user U01ABCDEF --pretty
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--pretty` | false | Pretty-print output |
-| `--all` | false | Fetch all pages automatically |
+| `--all` | false | Fetch all pages automatically (`thread-read` is already exhaustive) |
 | `--limit` | 0 | Items per API request (0 = API default) |
 | `--cursor` | "" | Pagination cursor |
 | `--timeout` | 30s | HTTP timeout |
 | `--debug` | false | Debug logging to stderr |
-| `--max-results` | 10000 | Max results with `--all` |
+| `--max-results` | 10000 | Maximum total results during exhaustive retrieval (0 is unlimited) |
 | `--wait-on-rate-limit` | false | Retry on rate limit |
 
 ## Exit Codes
@@ -151,7 +151,7 @@ slack-cli resolve usergroup platform-team --field all          # prints full JSO
 
 ### Cache Management
 
-The cache warms automatically on first use each day. Four separate files for fast lookups:
+Cache warming is explicit. Cache-dependent commands perform local migrations and warn when the cache is missing or stale. Four separate files provide fast lookups:
 
 ```bash
 slack-cli cache warm     # Fetch all channels, people, usergroups (also builds id-to-name index)
@@ -185,39 +185,41 @@ Cache location: `~/.slack-cli/` (override with `SLACK_CLI_CACHE_DIR` env var).
 
 ## Reading Threads and Messages
 
-These commands return name-resolved, human-readable output in one call — no jq pipelines, no separate user-info calls, no manual pagination.
+These commands return name-resolved, human-readable output from one CLI invocation — no jq pipelines, no separate user-info commands, and no manual pagination.
 
 ### thread-read
 
-Reads a full Slack thread (root + all replies) in chronological order. One API call.
+Reads the complete requested Slack thread window (parent plus replies) in chronological order, resolves author names, and includes reaction emoji names with authoritative counts. Prefer a pasted permalink:
 
 ```bash
-# From a Slack URL (copy link from Slack)
-slack-cli thread-read --url "https://stackexchange.slack.com/archives/C0AFM69EB1B/p1775827095264229"
-
-# From explicit channel + timestamp
-slack-cli thread-read --channel C0AFM69EB1B --ts 1775827095.264229
-
-# JSON output (RFC3339 timestamps, array of objects)
-slack-cli thread-read --url "..." --json
+slack-cli thread-read \
+  "https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229"
 ```
 
-**Default output:**
-```
-Peter O'Connor [2026-04-10 09:18]: This ODR affects y'all...
-Brendan Rosage [2026-04-10 09:32]: This doc provides context...
-Alex Lato [2026-04-10 09:35]: This is explicitly something we need to rethink...
+Reply permalinks are accepted and automatically anchor retrieval at the parent `thread_ts`. Existing forms remain valid:
+
+```bash
+slack-cli thread-read --url "https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229"
+slack-cli thread-read --channel C09M260TY7Q --ts 1784131538.270229
 ```
 
-**JSON output:**
-```json
-[
-  {"user": "Peter O'Connor", "ts": "2026-04-10T09:18:15-05:00", "text": "This ODR affects y'all..."},
-  {"user": "Brendan Rosage", "ts": "2026-04-10T09:32:41-05:00", "text": "This doc provides context..."}
-]
+Use JSON for automation:
+
+```bash
+slack-cli thread-read "https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229" --json
 ```
 
-Timestamps are shown in local time (default) or RFC3339 with offset (`--json`). Bot messages display as `[bot]`. Unresolved user IDs fall back to the raw ID.
+Each JSON message always has `user`, RFC3339 `ts`, exact `slack_ts`, `text`, and a `reactions` array. `--include-all-metadata` adds `metadata` only when Slack returned it. Reactor identities, attachments, files, blocks, unfurls, and summaries are intentionally excluded.
+
+Retrieval is exhaustive by default. `--limit` sets Slack's page size; `--max-results` caps unique returned messages (`0` means unlimited); `--cursor` resumes; and `--oldest`, `--latest`, plus `--inclusive` narrow the requested window. A cap with more pages exits 0, writes the messages to stdout, and writes a resumable incomplete-result status to stderr. Use `--wait-on-rate-limit` to wait for `Retry-After` with cancellable bounded retries.
+
+**Human output:**
+
+```text
+Peter O'Connor [2026-07-15 13:05]: The deployment is complete.
+  Reactions: :eyes: 2, :white_check_mark: 4
+Brendan Rosage [2026-07-15 13:07]: Confirmed.
+```
 
 ### message-read
 
@@ -245,7 +247,7 @@ slack-cli message-read --url "..." --json
 
 ### Name Resolution
 
-Both commands resolve user IDs to display names automatically using the local cache (`~/.slack-cli/id-to-name.json`). The cache is warmed on first use each day. If a user ID is not in the cache, the raw ID is shown as a fallback.
+Both commands resolve user IDs to display names using the local cache (`~/.slack-cli/id-to-name.json`). They warn when the cache needs an explicit `slack-cli cache warm`; if a user ID is not cached, the raw ID is shown as a fallback.
 
 ## Common Patterns
 
@@ -406,5 +408,5 @@ After Slack operations, verify:
 | Exit code 4 | Network issue, check connectivity |
 | Rate limited | Use `--wait-on-rate-limit` or reduce request frequency |
 | `resolve` returns "no channel named..." | Channel may be new; run `slack-cli cache warm` to refresh |
-| Cache stale / slow first resolve of day | Normal - auto-warm fetches all entities on first use |
+| Cache stale or missing | Run `slack-cli cache warm`; cache-dependent commands warn but do not fetch automatically |
 | Override cache location | Set `SLACK_CLI_CACHE_DIR` env var |

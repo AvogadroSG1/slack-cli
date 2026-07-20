@@ -168,6 +168,30 @@ slack-cli search messages --query "deploy failed"
 slack-cli conversations list --limit 10 | jq '.[].name'
 ```
 
+#### Read a complete thread
+
+Paste a Slack permalink directly. `thread-read` anchors reply permalinks at their parent, follows every cursor page by default, resolves author names from the local cache, and includes reaction names with Slack's authoritative counts.
+
+```bash
+slack-cli thread-read \
+  "https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229"
+
+slack-cli thread-read --url "https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229"
+
+slack-cli thread-read --channel C09M260TY7Q --ts 1784131538.270229
+```
+
+The human default keeps one line per message and adds one indented reaction line when needed:
+
+```text
+Peter O'Connor [2026-07-15 13:05]: The deployment is complete.
+  Reactions: :eyes: 2, :white_check_mark: 4
+```
+
+Use `--json` for a stable top-level message array. Every object contains `user`, `ts`, `slack_ts`, `text`, and `reactions`; `metadata` is added only with `--include-all-metadata` and only when Slack returned it.
+
+`--limit` controls each Slack API page. `--max-results` controls total unique messages and defaults to `10000`; `0` is unlimited. If a cap stops retrieval while another cursor exists, stdout still contains the selected messages, stderr identifies the result as incomplete, and `--cursor` resumes the same filtered window. `--oldest`, `--latest`, and `--inclusive` narrow that window. `--all` is accepted but unnecessary because `thread-read` is exhaustive by default.
+
 ### Global Flags
 
 These flags are available on every command:
@@ -175,12 +199,12 @@ These flags are available on every command:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--pretty` | bool | `false` | Pretty-print output (tables for maps, indented JSON for lists) |
-| `--all` | bool | `false` | Fetch all pages of results automatically |
+| `--all` | bool | `false` | Fetch all pages automatically; `thread-read` is exhaustive without `--all` and still honors `--max-results` |
 | `--limit` | int | `0` | Maximum items per API request (0 uses API default) |
 | `--cursor` | string | `""` | Pagination cursor for resuming a previous request |
 | `--timeout` | duration | `30s` | HTTP timeout for API calls |
 | `--debug` | bool | `false` | Enable debug logging to stderr |
-| `--max-results` | int | `10000` | Maximum total results when using `--all` |
+| `--max-results` | int | `10000` | Maximum total results during exhaustive retrieval (`0` is unlimited); `thread-read` honors it without `--all` |
 | `--wait-on-rate-limit` | bool | `false` | Wait and retry when rate-limited instead of failing |
 
 ### Pagination
