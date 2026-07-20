@@ -23,6 +23,8 @@ Callers need one stable semantic command that accepts their normal pasted permal
 - Human output MUST remain concise.
 - JSON MUST preserve exact Slack message identity.
 - Pagination limits and incomplete results MUST be unambiguous.
+- The default request size MUST remain valid for every currently documented Slack application class.
+- A cap MUST NOT create a cursor that skips discarded messages during resumption.
 - The retrieval loop MUST be isolated and testable without live Slack access.
 - Reactor identities MUST NOT be implied to be complete when Slack does not guarantee completeness.
 
@@ -36,9 +38,13 @@ Callers need one stable semantic command that accepts their normal pasted permal
 
 The existing `thread-read` command will be evolved because it already owns the semantic thread-reading use case and provides the established human and JSON output contracts.
 
-The command will accept a positional permalink while preserving `--url` and `--channel` plus `--ts`. It will retrieve all cursor pages by default, treat `--limit` as API page size and `--max-results` as the total cap, disclose capped results, and include reaction name/count summaries on every message.
+The command will accept a positional permalink while preserving `--url` and `--channel` plus `--ts`. It will retrieve all cursor pages by default, treat `--limit` as API page size and `--max-results` as the thread-specific total cap, disclose capped results, and include reaction name/count summaries on every message.
+
+When `--limit=0`, `thread-read` will use an effective page size of 15. Explicit page sizes will be limited to 1 through 999. Each request will be no larger than the finite remaining result capacity, preserving an exact cursor boundary for resumption. The global `--max-results` documentation will qualify that zero means unlimited for `thread-read`; it will not claim that generic commands share this semantic.
 
 JSON will remain a top-level array. Each JSON message will add exact `slack_ts` and an always-present `reactions` array. Human output will add one indented reaction line only when reactions exist.
+
+Cache failures will continue to fall back to raw Slack IDs. In JSON mode, plain-text cache warnings will be suppressed so structured incomplete-result stderr remains one valid JSON object.
 
 ### Consequences
 
@@ -48,16 +54,40 @@ JSON will remain a top-level array. Each JSON message will add exact `slack_ts` 
 - Good, because exact Slack timestamps preserve message identity for automation.
 - Good, because reaction counts are useful without overstating the completeness of reactor lists.
 - Good, because an injectable pagination boundary enables deterministic BDD coverage.
+- Good, because the zero-value page size is valid for the lowest currently documented Slack application-class limit.
+- Good, because shrinking requests to the remaining capacity preserves exact cursor resumption without discarding overfetched messages.
 - Bad, because exhaustive retrieval can make additional API calls and encounter rate limits.
 - Bad, because the command needs dedicated pagination behavior instead of reusing the existing generic helper unchanged.
 - Bad, because JSON consumers that reject unknown fields may need to permit the additive `slack_ts` and `reactions` fields.
 - Bad, because capped results require callers to observe stderr for the resumable cursor while stdout remains the compatible array.
+- Bad, because the conservative default can require more API calls than a less restricted application would need.
+- Bad, because callers who deliberately choose an explicit page size above their app-specific maximum can still receive a Slack API rejection.
+
+### Page-size options
+
+#### Use 15 when `--limit=0` — chosen
+
+- Good, because 15 is valid for the lowest currently documented maximum and default applied to an affected Slack application class.
+- Good, because the client controls the request size and can shrink it to the remaining result capacity.
+- Bad, because applications allowed larger pages need more requests unless the caller supplies an explicit `--limit`.
+
+#### Use 200 when `--limit=0`
+
+- Good, because Slack recommends no more than 200 for ordinary cursor pagination and this reduces API calls.
+- Bad, because it exceeds the documented maximum for a more restricted application class and can fail on the first request.
+
+#### Send no limit and use Slack's server default
+
+- Good, because Slack chooses a default appropriate to the application.
+- Bad, because the client cannot shrink the request to a smaller remaining result capacity.
+- Bad, because discarding overfetched messages while returning the page's next cursor could create a gap when the caller resumes.
 
 ## Confirmation
 
 The decision is confirmed when:
 
 - BDD scenarios cover positional and reply permalinks, legacy inputs, multi-page retrieval, narrowing, caps, retries, ordering, deduplication, reactions, metadata, and error paths.
+- BDD scenarios prove the default page size of 15, explicit page-size validation below 1000, cap-sized final requests, and valid JSON-only incomplete diagnostics when cache warnings would otherwise occur.
 - `make test` and `make lint` pass.
 - README, CLI skill guidance, help text, contributor documentation, the design specification, and this ADR agree.
 - A reviewer confirms that `message-read` and the generic `conversations replies` command retain their existing contracts.

@@ -14,15 +14,16 @@
 - Exactly one input mode MUST be supplied: one positional permalink, `--url`, or `--channel` together with `--ts`.
 - The parser MUST accept HTTP or HTTPS Slack permalinks, `C`, `D`, and `G` conversation IDs, strict Slack timestamps, `thread_ts`, and matching `cid` values.
 - Retrieval MUST be exhaustive by default and MUST keep `--limit` as page size, `--max-results` as total unique-message capacity, and `--all` as an accepted no-op.
-- `--limit=0` MUST use Slack's default unless finite remaining capacity is supplied as the final page limit; `--max-results=0` MUST mean unlimited; the inherited default MUST remain `10000`.
+- For `thread-read`, `--limit=0` MUST select an effective page size of 15; an explicit page size MUST be between 1 and 999; each request MUST shrink to a smaller finite remaining capacity; `--max-results=0` MUST mean unlimited; the inherited default MUST remain `10000`.
 - `--oldest`, `--latest`, `--inclusive`, `--cursor`, and `--include-all-metadata` MUST be carried unchanged across pages, except that each returned cursor replaces the initial cursor.
 - Messages MUST be deduplicated and ordered by exact Slack timestamp; every message MUST count once toward `--max-results`, including the parent.
 - A repeated cursor, API failure, cancellation, or exhausted rate-limit retries MUST fail without writing a partial thread to stdout.
 - With `--wait-on-rate-limit`, the implementation MUST wait cancellably for `Retry-After` and allow three retries after the initial request; a fourth consecutive rate-limit response for the same cursor MUST fail. A successful page MUST reset the counter.
 - JSON stdout MUST remain a top-level array and preserve `user`, `ts`, and `text`; `slack_ts` and an always-present `reactions` array are additive.
+- JSON mode MUST perform local cache preparation without emitting a plain-text cache warning, so incomplete-result stderr remains one valid JSON object; human mode MUST retain the existing warning.
 - Reaction summaries MUST contain only `name` and Slack's authoritative `count`, sorted lexicographically; reactor identities MUST NOT be returned or fetched.
 - Metadata MUST appear only in JSON, only when `--include-all-metadata` is set, and only when Slack returned metadata for that message.
-- `message-read`, its formatter/schema, `internal/dispatch.Paginate`, and the generic `conversations replies` command MUST NOT change.
+- `message-read`, its formatter/schema, `internal/dispatch.Paginate`, and the generic `conversations replies` command MUST NOT change behavior. `internal/override/read_format.go` MAY change only its stale `readMessage` ownership comment.
 - Implementation MUST use BDD Red-Green-Refactor. `make test` and `make lint` MUST pass before completion.
 - Every commit MUST include `Co-Authored-By: Peter O'Connor <poconnor@stackoverflow.com>` and `Co-Authored-By: Codex <noreply@anthropic.com> - GPT-5`.
 - Each task SHOULD remain a focused review unit; if the complete change exceeds the repository's 300-line PR preference, execution SHOULD use stacked PRs at task boundaries without breaking the working-software sequence.
@@ -30,19 +31,26 @@
 
 ---
 
+## Remediation context
+
+Tasks 1 through 6 describe the implemented and reviewed baseline at commit `44a4993`. Their first final review identified the Slack page-size, JSON diagnostic, help-text, contributor-guidance, and stale-comment findings now incorporated into the approved design and ADR. Execution MUST resume at Task 7, MUST complete Task 8, and MUST use Task 9 to repeat the entire acceptance and publication bar; implementers MUST NOT rerun Tasks 1 through 6 as new work.
+
 ## File Structure
 
 | File | Action | Responsibility |
 |---|---|---|
 | `internal/override/thread_reference.go` | Create | Pure permalink parsing, mutually exclusive input-mode resolution, and retrieval-filter validation. |
-| `internal/override/thread_reference_test.go` | Create | BDD coverage for positional/legacy inputs, reply anchoring, IDs, query validation, conflicts, and range validation. |
-| `internal/override/thread_fetch.go` | Create | Injectable Slack client boundary, cursor loop, rate-limit waiting, deduplication, ordering, and completeness state. |
-| `internal/override/thread_fetch_test.go` | Create | BDD coverage for pages, cursors, limits, retries, cancellation, failures, ordering, and truncation. |
+| `internal/override/thread_reference_test.go` | Create | BDD coverage for positional/legacy inputs, reply anchoring, IDs, query validation, conflicts, range validation, and page-limit bounds. |
+| `internal/override/thread_fetch.go` | Create | Injectable Slack client boundary, conservative page sizing, cursor loop, rate-limit waiting, deduplication, ordering, and completeness state. |
+| `internal/override/thread_fetch_test.go` | Create | BDD coverage for pages, cursors, the 15-item default, cap-sized requests, retries, cancellation, failures, ordering, and truncation. |
 | `internal/override/thread_format.go` | Create | Thread-only normalized model, reaction/metadata normalization, human/JSON formatters, and incomplete-result formatter. |
 | `internal/override/thread_format_test.go` | Create | Stable human/JSON snapshots, reaction ordering, metadata omission, author fallback, and write failures. |
-| `internal/override/thread_read_cmd.go` | Modify | Compose input parsing, auth, cache, fetching, formatting, incomplete status, and exit classification. |
-| `internal/override/thread_read_cmd_test.go` | Replace | Command BDD tests with fake client/cache/wait dependencies and stdout/stderr assertions. |
-| `cmd/slack-cli/main.go` | Modify | Keep inherited `--pretty`, `--all`, and `--max-results` help accurate for semantic and generic commands. |
+| `internal/override/thread_read_cmd.go` | Modify | Compose input parsing, auth, quiet JSON cache preparation, fetching, formatting, incomplete status, and exit classification. |
+| `internal/override/thread_read_cmd_test.go` | Replace | Command BDD tests with fake client/cache/wait dependencies and stdout/stderr assertions, including structured JSON-only stderr. |
+| `internal/override/resolve_cmd.go` | Modify | Preserve existing cache preparation while allowing `thread-read --json` to suppress only the plain-text readiness warning. |
+| `internal/override/warn_test.go` | Modify | Prove cache-warning suppression does not affect existing human warnings. |
+| `cmd/slack-cli/main.go` | Modify | Keep inherited `--pretty`, `--all`, `--limit`, and `--max-results` help accurate for semantic and generic commands. |
+| `internal/override/read_format.go` | Modify comment only | Correct stale ownership text without changing `message-read` behavior or schema. |
 | `internal/override/read_format_test.go` | Modify | Add exact compatibility snapshots proving `message-read`'s formatter did not change. |
 | `README.md` | Modify | Document pasted permalinks, exhaustive retrieval, reactions, filters, caps, and output contracts. |
 | `skill/SKILL.md` | Modify | Prefer positional `thread-read` and explain resumable completeness. |
@@ -50,7 +58,7 @@
 | `docs/adr/0001-exhaustive-thread-read.md` | Verify | Confirm the accepted MADR remains aligned; edit only if implementation changes an approved decision. |
 | `docs/superpowers/specs/2026-07-20-thread-read-reactions-design.md` | Verify | Confirm every acceptance criterion is represented and preserve its existing AI footer. |
 
-The existing `internal/override/slack_url.go` and `internal/override/read_format.go` MUST remain unchanged. They are the compatibility boundary for `message-read`; thread permalinks need stricter, parent-aware behavior and therefore receive dedicated code.
+The existing `internal/override/slack_url.go` MUST remain unchanged. `internal/override/read_format.go` is the compatibility boundary for `message-read` and MUST remain behaviorally unchanged; its stale comment MAY be corrected to say `readMessage` belongs to `message-read`. Thread permalinks need stricter, parent-aware behavior and therefore receive dedicated code.
 
 ```mermaid
 flowchart LR
@@ -2101,6 +2109,471 @@ rtk git log --oneline --decorate -6
 
 Expected: implementation commits are present, the worktree contains no unintended tracked changes, and all required checks/reviews are recorded in the execution handoff or pull request.
 
+### Task 7: Enforce Slack-compatible thread page sizes
+
+**Files:**
+- Modify: `internal/override/thread_reference.go:122-143`
+- Modify: `internal/override/thread_reference_test.go:114-145`
+- Modify: `internal/override/thread_fetch.go:12-125`
+- Modify: `internal/override/thread_fetch_test.go:87-147`
+
+**Interfaces:**
+- Consumes: `threadFetchOptions.Limit`, `threadFetchOptions.MaxResults`, and the number of unique selected messages.
+- Produces: `defaultThreadPageLimit = 15`, validation that permits only 0 through 999, and `threadPageLimit(limit, maxResults, selected) int` that never deliberately requests beyond a finite remaining capacity.
+
+- [ ] **Step 1: Write failing validation scenarios for Slack's cursor limit boundary**
+
+Add these rows to `TestValidateThreadFilters` in `internal/override/thread_reference_test.go`:
+
+```go
+{name: "largest valid page", limit: 999},
+{name: "Slack cursor limit boundary", limit: 1000, wantErr: "between 0 and 999"},
+{name: "above Slack cursor limit", limit: 1500, wantErr: "between 0 and 999"},
+```
+
+- [ ] **Step 2: Run the focused validation test and verify red**
+
+Run:
+
+```bash
+rtk go test -race -count=1 ./internal/override -run '^TestValidateThreadFilters$' -v
+```
+
+Expected: FAIL because limits of 1000 and 1500 are currently accepted.
+
+- [ ] **Step 3: Enforce the explicit page-size range**
+
+Replace the first guard in `validateThreadFilters` with:
+
+```go
+if limit < 0 || limit >= 1000 {
+	return fmt.Errorf("--limit must be between 0 and 999")
+}
+```
+
+Run the command from Step 2 again. Expected: PASS.
+
+- [ ] **Step 4: Write failing fetcher scenarios for the conservative default and exact cap**
+
+In `TestFetchThreadMaximumResultSemantics`, replace the existing `zero limit uses remaining capacity` row with these rows:
+
+```go
+{
+	name: "zero limit uses conservative default", options: threadFetchOptions{MaxResults: 100},
+	pages:     []fakeThreadPage{{messages: []slack.Message{slackMessage("1784131538.270229")}}},
+	wantCount: 1, wantComplete: true, wantLimits: []int{15},
+},
+{
+	name: "zero limit shrinks to remaining capacity", options: threadFetchOptions{MaxResults: 3},
+	pages:     []fakeThreadPage{{messages: []slack.Message{slackMessage("1784131538.270229")}}},
+	wantCount: 1, wantComplete: true, wantLimits: []int{3},
+},
+{
+	name: "zero limit with unlimited maximum uses conservative default",
+	options: threadFetchOptions{},
+	pages: []fakeThreadPage{
+		{messages: []slack.Message{slackMessage("1784131538.270229")}, nextCursor: "next"},
+		{messages: []slack.Message{slackMessage("1784131630.101010")}},
+	},
+	wantCount: 2, wantComplete: true, wantLimits: []int{15, 15},
+},
+```
+
+- [ ] **Step 5: Run the focused fetcher test and verify red**
+
+Run:
+
+```bash
+rtk go test -race -count=1 ./internal/override -run '^TestFetchThreadMaximumResultSemantics$' -v
+```
+
+Expected: FAIL because `--limit=0` currently becomes 0 for an unlimited fetch and becomes the entire remaining capacity for a finite fetch.
+
+- [ ] **Step 6: Implement the conservative effective page size**
+
+Add the constant beside `maxConsecutiveRateLimitRetries`:
+
+```go
+const (
+	defaultThreadPageLimit          = 15
+	maxConsecutiveRateLimitRetries = 3
+)
+```
+
+Replace `threadPageLimit` with:
+
+```go
+func threadPageLimit(limit, maxResults, selected int) int {
+	effective := limit
+	if effective == 0 {
+		effective = defaultThreadPageLimit
+	}
+	if maxResults == 0 {
+		return effective
+	}
+	remaining := maxResults - selected
+	if remaining < effective {
+		return remaining
+	}
+	return effective
+}
+```
+
+- [ ] **Step 7: Format and prove the page-size slice is green**
+
+Run:
+
+```bash
+rtk gofmt -w internal/override/thread_reference.go internal/override/thread_reference_test.go internal/override/thread_fetch.go internal/override/thread_fetch_test.go
+rtk go test -race -count=1 ./internal/override -run 'Test(ValidateThreadFilters|FetchThreadMaximumResultSemantics|FetchThreadPaginates)' -v
+rtk go test -race -count=1 ./internal/override -v
+rtk git diff --check
+```
+
+Expected: every test PASSes; default requests use 15, finite capacities below 15 shrink the request, explicit 999 is accepted, and 1000 is rejected.
+
+- [ ] **Step 8: Commit the green pagination slice**
+
+```bash
+rtk git add internal/override/thread_reference.go internal/override/thread_reference_test.go internal/override/thread_fetch.go internal/override/thread_fetch_test.go
+rtk git commit -m "fix: constrain thread-read page sizes" -m "Co-Authored-By: Peter O'Connor <poconnor@stackoverflow.com>
+Co-Authored-By: Codex <noreply@anthropic.com> - GPT-5"
+```
+
+- [ ] **Step 9: Complete the task review gate**
+
+The specification reviewer MUST trace the page-size implementation to the amended design and ADR. The code-quality reviewer MUST confirm exact-cap resumption cannot skip discarded messages and no generic paginator changed. Address every finding and rerun Step 7 before Task 8.
+
+### Task 8: Preserve structured JSON diagnostics and correct public guidance
+
+**Files:**
+- Modify: `internal/override/resolve_cmd.go:123-142`
+- Modify: `internal/override/warn_test.go:1-82`
+- Modify: `internal/override/thread_read_cmd.go:12-130`
+- Modify: `internal/override/thread_read_cmd_test.go:1-324`
+- Modify: `cmd/slack-cli/main.go:60-65`
+- Modify comment only: `internal/override/read_format.go:12-14`
+- Modify: `README.md:173-207`
+- Modify: `skill/SKILL.md:88-104`
+- Modify: `CONTRIBUTING.md:283-306`
+
+**Interfaces:**
+- Consumes: `cache.EnsureReady`, `cache.IsStale`, Cobra stderr, and `threadReadDependencies`.
+- Produces: `prepareCache(*cobra.Command, bool)`, a thread dependency that always performs local preparation but emits cache warnings only when requested, qualified inherited flag help, and contributor guidance matching semantic-command validation.
+
+- [ ] **Step 1: Write failing cache-warning mode tests**
+
+In `internal/override/warn_test.go`, add this test:
+
+```go
+func TestPrepareCacheCanSuppressWarnings(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SLACK_CLI_CACHE_DIR", dir)
+	cmd := &cobra.Command{Use: "test"}
+	var stderr bytes.Buffer
+	cmd.SetErr(&stderr)
+
+	prepareCache(cmd, false)
+
+	if stderr.Len() != 0 {
+		t.Errorf("stderr = %q, want empty", stderr.String())
+	}
+}
+```
+
+In `internal/override/thread_read_cmd_test.go`, add `fmt` to the standard-library imports, change `successfulThreadDependencies` to initialize `prepareCache`, and add this test:
+
+```go
+func TestThreadReadJSONSuppressesPlaintextCacheWarning(t *testing.T) {
+	client := &fakeThreadClient{pages: []fakeThreadPage{{
+		messages:   []slack.Message{slackMessage("1784131538.270229")},
+		nextCursor: "resume-cursor",
+	}}}
+	dependencies := successfulThreadDependencies(client)
+	preparations := 0
+	dependencies.prepareCache = func(cmd *cobra.Command, warnings bool) {
+		preparations++
+		if warnings {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Warning: cache not warmed")
+		}
+	}
+	stdout, stderr, err := executeThreadRead(
+		t,
+		dependencies,
+		"https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229",
+		"--json", "--max-results", "1",
+	)
+	if err != nil {
+		t.Fatalf("error = %v", err)
+	}
+	if preparations != 1 {
+		t.Errorf("cache preparations = %d, want 1", preparations)
+	}
+	var messages []map[string]any
+	if err := json.Unmarshal([]byte(stdout), &messages); err != nil {
+		t.Fatalf("stdout = %q: %v", stdout, err)
+	}
+	var status threadIncompleteStatus
+	if err := json.Unmarshal([]byte(stderr), &status); err != nil {
+		t.Fatalf("stderr = %q, want one JSON status object: %v", stderr, err)
+	}
+	if status.NextCursor != "resume-cursor" {
+		t.Errorf("next cursor = %q, want resume-cursor", status.NextCursor)
+	}
+}
+```
+
+Update the dependency returned by `successfulThreadDependencies` to contain:
+
+```go
+prepareCache: func(*cobra.Command, bool) {},
+```
+
+Update `TestThreadReadLoadsCacheOnce` so its cache-preparation fake records the warning mode:
+
+```go
+var warningModes []bool
+dependencies.prepareCache = func(_ *cobra.Command, warnings bool) {
+	warningModes = append(warningModes, warnings)
+}
+```
+
+After execution, retain the one-load assertion and add:
+
+```go
+if len(warningModes) != 1 || !warningModes[0] {
+	t.Errorf("cache warning modes = %v, want [true]", warningModes)
+}
+```
+
+- [ ] **Step 2: Run the focused diagnostic tests and verify red**
+
+Run:
+
+```bash
+rtk go test -race -count=1 ./internal/override -run 'Test(PrepareCacheCanSuppressWarnings|ThreadReadJSONSuppressesPlaintextCacheWarning|ThreadReadLoadsCacheOnce)' -v
+```
+
+Expected: FAIL to compile because `prepareCache` and the new dependency field do not exist.
+
+- [ ] **Step 3: Separate cache preparation from warning emission**
+
+Replace `warnIfCacheNotReady` in `internal/override/resolve_cmd.go` with:
+
+```go
+// prepareCache runs local-only migrations and optionally warns when the cache
+// is stale or empty. It never blocks on Slack or returns an error.
+func prepareCache(cmd *cobra.Command, warnings bool) {
+	_, err := cache.EnsureReady(cmd.Context(), nil)
+	if err != nil {
+		if warnings {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: cache migration failed: %v\n", err)
+		}
+		return
+	}
+
+	stale, _ := cache.IsStale()
+	if stale && warnings {
+		fmt.Fprintln(cmd.ErrOrStderr(),
+			"Warning: cache not warmed. Run \"slack-cli cache warm\" for faster lookups.")
+	}
+}
+
+// warnIfCacheNotReady preserves warning behavior for existing human-oriented commands.
+func warnIfCacheNotReady(cmd *cobra.Command) {
+	prepareCache(cmd, true)
+}
+```
+
+- [ ] **Step 4: Make `thread-read` choose the warning mode after validation**
+
+Change the cache dependency in `threadReadDependencies` to:
+
+```go
+prepareCache func(*cobra.Command, bool)
+```
+
+Wire it in `newThreadReadCmd` with:
+
+```go
+prepareCache: prepareCache,
+```
+
+Immediately after filter validation in `runThreadRead`, read the JSON flag:
+
+```go
+asJSON, _ := cmd.Flags().GetBool("json")
+```
+
+After the nil-client guard, replace `dependencies.warnCache(cmd)` with:
+
+```go
+dependencies.prepareCache(cmd, !asJSON)
+```
+
+Remove the later duplicate `asJSON` assignment before normalization.
+
+- [ ] **Step 5: Run the diagnostic and full override suites**
+
+Run:
+
+```bash
+rtk gofmt -w internal/override/resolve_cmd.go internal/override/warn_test.go internal/override/thread_read_cmd.go internal/override/thread_read_cmd_test.go
+rtk go test -race -count=1 ./internal/override -run 'Test(PrepareCache|WarnIfCache|ThreadReadJSON|ThreadReadLoadsCacheOnce)' -v
+rtk go test -race -count=1 ./internal/override -v
+```
+
+Expected: PASS; JSON incomplete stderr unmarshals as one object, JSON still performs one cache preparation, and human mode still requests warnings.
+
+- [ ] **Step 6: Correct help, documentation, and the stale ownership comment**
+
+Use these exact inherited help strings in `cmd/slack-cli/main.go`:
+
+```go
+pf.Int("limit", 0, "Maximum items per API request (thread-read: 0 uses 15; other commands: API default)")
+pf.Int("max-results", 10000, "Maximum total results during exhaustive retrieval (thread-read: 0 is unlimited)")
+```
+
+In the `README.md` thread-read section, state that `--limit=0` selects 15, explicit limits MUST be 1 through 999, and a finite remaining capacity shrinks the next request. In the global flag table, qualify both zero-value descriptions as thread-specific and retain generic API-default behavior for other commands.
+
+In `skill/SKILL.md`, apply the same thread-specific wording to the global flag table and thread-read guidance. The skill MUST NOT claim generic `--max-results=0` is unlimited.
+
+Replace the `readMessage` comment in `internal/override/read_format.go` with:
+
+```go
+// readMessage is the normalised representation used by the message-read formatter.
+```
+
+Replace the conflicting contributor bullets in `CONTRIBUTING.md` with:
+
+```markdown
+- Validate semantic input before checking `client == nil` when the command contract gives malformed input precedence over missing authentication; otherwise check the client first
+- Use `prepareCache(cmd, !asJSON)` when a JSON semantic command MUST run local cache preparation without mixing a plain-text warning into structured stderr; existing human-oriented commands use `warnIfCacheNotReady(cmd)`
+- Use `MarkFlagsMutuallyExclusive` and `MarkFlagsRequiredTogether` for simple flag-only relationships; validate positional-versus-flag modes and other mixed semantic constraints in `RunE`
+```
+
+Add `prepareCache(cmd, warnings)` to the shared-helper table as the local cache preparation boundary with optional warning emission.
+
+- [ ] **Step 7: Verify documentation and public help agree**
+
+Run:
+
+```bash
+rtk go run ./cmd/slack-cli thread-read --help
+rtk rg -n "thread-read: 0|uses 15|1 through 999|prepareCache|mixed semantic|message-read formatter" cmd/slack-cli/main.go README.md skill/SKILL.md CONTRIBUTING.md internal/override/read_format.go
+rtk rg -n 'Maximum total results during exhaustive retrieval \(0 is unlimited\)|used by both thread-read and message-read|Always check `client == nil` first' cmd/slack-cli/main.go README.md skill/SKILL.md CONTRIBUTING.md internal/override/read_format.go
+rtk git diff --check
+```
+
+Expected: help and all documentation qualify zero values correctly; the final stale-pattern search returns no matches; no whitespace error is reported.
+
+- [ ] **Step 8: Commit the structured-diagnostic and guidance slice**
+
+```bash
+rtk git add internal/override/resolve_cmd.go internal/override/warn_test.go internal/override/thread_read_cmd.go internal/override/thread_read_cmd_test.go cmd/slack-cli/main.go internal/override/read_format.go README.md skill/SKILL.md CONTRIBUTING.md
+rtk git commit -m "fix: keep thread-read diagnostics structured" -m "Co-Authored-By: Peter O'Connor <poconnor@stackoverflow.com>
+Co-Authored-By: Codex <noreply@anthropic.com> - GPT-5"
+```
+
+- [ ] **Step 9: Complete the task review gate**
+
+The specification reviewer MUST verify input-error precedence, JSON diagnostic validity, human cache warnings, flag-help scope, and the explicit comment-only protected-surface exception. The code-quality reviewer MUST confirm cache preparation still runs once in both output modes and `message-read` behavior is unchanged. Address every finding and rerun Steps 5 and 7 before Task 9.
+
+### Task 9: Re-prove the complete acceptance and publication bar
+
+**Files:**
+- Verify every tracked file changed since `9247e87`
+- Verify artifact: `bin/slack-cli`
+- Verify mirrors: design, ADR, and implementation plan under `/Users/poconnor/ObsidianNotes/Work/drafts/`
+
+**Interfaces:**
+- Consumes: the complete feature plus Tasks 7 and 8 remediation.
+- Produces: green tests, lint, build and help smokes, exact documentation mirrors, approved final reviews, and a mergeable feature branch.
+
+- [ ] **Step 1: Run the mandatory automated gates**
+
+Run:
+
+```bash
+rtk make test
+rtk make lint
+rtk make build
+```
+
+Expected: race-enabled tests PASS, lint exits 0 with no findings, and `bin/slack-cli` builds successfully.
+
+- [ ] **Step 2: Run focused acceptance and public-surface smokes**
+
+Run:
+
+```bash
+rtk go test -race -count=1 ./internal/override -run 'Test(ThreadRead|ParseThread|ResolveThread|ValidateThread|FetchThread|WaitForRetry|NormalizeThread|FormatThread|WriteThread|PrepareCache|WarnIfCache|MessageReadFormatter)' -v
+rtk ./bin/slack-cli thread-read --help
+rtk ./bin/slack-cli message-read --help
+rtk ./bin/slack-cli conversations replies --help
+```
+
+Expected: all focused scenarios PASS; thread help describes 15 and thread-specific unlimited semantics; protected command surfaces remain available.
+
+- [ ] **Step 3: Prove protected behavior and the reviewed comment exception**
+
+Run:
+
+```bash
+rtk git diff 9247e87 -- internal/override/slack_url.go internal/override/message_read_cmd.go internal/dispatch/pagination.go internal/dispatch/impl_conversations.go internal/registry/generated.go
+rtk git diff 9247e87 -- internal/override/read_format.go
+rtk go test -race -count=1 ./internal/override -run 'Test(MessageRead|MessageReadFormatter)' -v
+```
+
+Expected: the first diff is empty; the `read_format.go` diff contains only the approved ownership-comment correction; all `message-read` tests PASS.
+
+- [ ] **Step 4: Verify authoritative document mirrors and commit trailers**
+
+Run:
+
+```bash
+rtk shasum -a 256 docs/superpowers/specs/2026-07-20-thread-read-reactions-design.md /Users/poconnor/ObsidianNotes/Work/drafts/2026-07-20-thread-read-reactions-design.md
+rtk shasum -a 256 docs/adr/0001-exhaustive-thread-read.md /Users/poconnor/ObsidianNotes/Work/drafts/0001-exhaustive-thread-read.md
+rtk shasum -a 256 docs/superpowers/plans/2026-07-20-thread-read-reactions.md /Users/poconnor/ObsidianNotes/Work/drafts/2026-07-20-thread-read-reactions-implementation-plan.md
+rtk tail -n 1 /Users/poconnor/ObsidianNotes/Work/drafts/2026-07-20-thread-read-reactions-design.md
+rtk tail -n 1 /Users/poconnor/ObsidianNotes/Work/drafts/0001-exhaustive-thread-read.md
+rtk tail -n 1 /Users/poconnor/ObsidianNotes/Work/drafts/2026-07-20-thread-read-reactions-implementation-plan.md
+rtk git log 2df6e24..HEAD --format=full
+```
+
+Expected: each source/draft pair has matching hashes and the required footer; every authored commit contains both mandated co-author trailers.
+
+- [ ] **Step 5: Attempt the allowed live Slack smoke**
+
+Use only the built CLI:
+
+```bash
+rtk ./bin/slack-cli thread-read "https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229" --json
+```
+
+Expected when credentials and access permit: exit 0, complete JSON message array, and no plain-text cache warning on stderr. If Slack rejects credentials or conversation access, record the exact external limitation and MUST NOT claim live proof; the local acceptance gates remain authoritative for merge.
+
+- [ ] **Step 6: Inspect final scope and secret boundary**
+
+Run:
+
+```bash
+rtk git status --short --branch
+rtk git diff --stat 2df6e24..HEAD
+rtk git diff --check 2df6e24..HEAD
+rtk git diff --name-only 2df6e24..HEAD
+```
+
+Expected: only intended feature, test, documentation, plan, ADR, and reviewed lint-baseline files are tracked; no token, cache content, binary, or unrelated `.agents`, `.claude`, `apm.yml`, or `apm.lock.yaml` artifact is included.
+
+- [ ] **Step 7: Complete final specification and code reviews**
+
+Dispatch both reviewers and wait for both. The specification reviewer MUST trace all thirteen amended acceptance criteria and every non-goal. The code-quality reviewer MUST inspect Slack page-limit compatibility, exact resumption, JSON stderr validity, cache preparation, error classification, output atomicity, and protected surfaces. Address every finding and rerun Steps 1-6. Both reviewers MUST approve before publication.
+
+- [ ] **Step 8: Publish with the requested full Git workflow**
+
+Because unrelated untracked local artifacts exist, use the `git-pushing` skill's manual path with explicit tracked files instead of `smart_commit.sh`, whose `git add .` would violate the scope boundary. Push the feature branch, open the PR, wait for required checks, merge through the PR, switch to `main`, pull, and delete the local and remote feature branches. Report the final merge commit, PR URL, current branch, sync state, and branch-deletion proof.
+
 ## Requirement Coverage Matrix
 
 | Specification requirement | Plan proof |
@@ -2109,15 +2582,18 @@ Expected: implementation commits are present, the worktree contains no unintende
 | Legacy `--url` and `--channel` plus `--ts`; conflicts | Task 1 resolver table; Task 4 JSON-envelope tests |
 | Exhaustive pagination, cursor resume, deduplication, ordering | Task 2 fetcher tests |
 | Filters, page limits, exact cap, cap-plus-one, unlimited | Task 1 filter tests; Task 2 parameter/cap tables |
+| Conservative page size 15, explicit 1-999, exact final capacity | Task 7 validation and fetcher tables |
 | Bounded rate-limit waiting and cancellation | Task 2 rate-limit tests |
 | No partial stdout on retrieval failures | Task 2 empty result on error; Task 4 stdout assertions |
 | Reaction summaries and empty arrays | Task 3 normalization and snapshots |
 | Optional JSON-only metadata | Task 3 normalization and JSON snapshot |
 | Cache resolution and fallbacks | Task 3 normalization; Task 4 one-load test |
+| JSON cache preparation without plain-text diagnostic contamination | Task 8 warning-mode and command tests |
 | Error envelope and exit codes | Task 4 input/auth/API/network/repetition/writer tests |
 | Human/JSON compatibility and `--json` precedence | Task 3 snapshots; Task 4 precedence test |
-| `message-read` and generic command unchanged | Tasks 1-4 guarded diffs; Task 6 protected-surface proof |
+| `message-read` and generic command unchanged | Tasks 1-4 guarded diffs; Tasks 6 and 9 protected-surface proof |
+| Stale `readMessage` ownership comment corrected without behavior change | Task 8 documentation correction; Task 9 protected-surface proof |
 | README, skill, contributor docs, help, ADR, spec, Obsidian | Task 5 |
-| `make test`, `make lint`, build, live smoke | Task 6 |
+| `make test`, `make lint`, build, live smoke | Tasks 6 and 9 |
 
 *Authored By Peter O'Connor with Assistance from Codex (GPT-5) · 2026-07-20 · slack-cli exhaustive thread-read implementation plan*

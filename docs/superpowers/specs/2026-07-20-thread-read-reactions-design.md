@@ -86,19 +86,21 @@ A bare Slack timestamp MUST NOT be accepted because it is only unique within a c
 | `--oldest` | Exclude messages before this timestamp |
 | `--latest` | Exclude messages after this timestamp |
 | `--inclusive` | Include messages matching boundary timestamps |
-| `--limit` | Maximum items requested per Slack API page |
-| `--max-results` | Maximum unique messages returned in total |
+| `--limit` | Target items requested per Slack API page; `0` selects the thread-safe default |
+| `--max-results` | Maximum unique thread messages returned in total |
 | `--include-all-metadata` | Request metadata and include it in JSON when present |
 | `--wait-on-rate-limit` | Wait and retry using Slack's `Retry-After` value |
 | `--all` | Accepted but redundant; `thread-read` is exhaustive by default |
 | `--json` | Emit the stable JSON representation |
 | `--pretty` | Accepted and equivalent to the human-readable default |
 
-`--limit=0` MUST use Slack's page-size default. `--max-results=0` MUST mean unlimited. The existing default of `--max-results=10000` remains unchanged.
+For `thread-read`, `--limit=0` MUST select a conservative effective page size of 15. This is the lowest currently documented maximum and default for an affected Slack application class, so the semantic command does not fail solely because it requested a page that is valid only for a less restricted class. An explicit nonzero `--limit` MUST be between 1 and 999 inclusive because Slack requires cursor-paginated limits below 1000. Slack MAY reject an explicit value that exceeds the lower app-specific limit applied to the caller's application.
+
+For `thread-read`, `--max-results=0` MUST mean unlimited. The existing default of `--max-results=10000` remains unchanged. Because `--max-results` is inherited by commands whose generic paginator retains different zero-value behavior, global help and documentation MUST qualify unlimited-zero semantics as specific to `thread-read` rather than promise it for every command.
 
 When `--json` and the inherited `--pretty` flag are both present, `--json` MUST take precedence, preserving the existing command's behavior.
 
-Negative limits, a negative maximum, and `oldest > latest` MUST produce input errors.
+Negative limits, limits of 1000 or greater, a negative maximum, and `oldest > latest` MUST produce input errors.
 
 ## Permalink normalization
 
@@ -140,7 +142,7 @@ The design SHOULD use these isolated components:
 
 The existing `internal/dispatch.Paginate` MUST NOT be reused unchanged because it currently treats `--limit` as an effective total limit.
 
-`message-read` MUST retain its existing formatter and JSON schema.
+`message-read` MUST retain its existing formatter and JSON schema. Correcting a stale source comment that inaccurately claims `readMessage` is shared with `thread-read` is an explicitly permitted documentation-only change to that protected compatibility surface.
 
 ## Retrieval and pagination
 
@@ -159,12 +161,12 @@ The command MUST:
 11. Count unique messages, including the parent, against `--max-results`.
 12. Sort the final result by exact Slack timestamp ascending.
 
-The final request's page size MUST be the smaller of:
+The effective page size MUST be:
 
-- The caller's `--limit`, when nonzero.
-- The remaining `--max-results` capacity.
+- 15 when `--limit=0`.
+- The caller's validated `--limit` when nonzero.
 
-When `--limit=0` and a finite capacity remains, the remaining capacity SHOULD be used as the final request limit to avoid overshooting.
+Each request's page size MUST then be the smaller of the effective page size and the remaining `--max-results` capacity when a finite capacity remains. With unlimited results, each request MUST use the effective page size. The fetcher MUST NOT deliberately overfetch beyond the remaining capacity because discarding part of a Slack page could make the returned cursor skip messages during resumption.
 
 With `--cursor`, `--oldest`, or `--latest`, completeness means complete for that requested window. The parent MAY be absent when the selected window excludes it.
 
@@ -196,6 +198,8 @@ Warning: result limited by --max-results; resume with --cursor dXNlcjp...
 ```
 
 When the final cursor is empty, no completeness warning is emitted.
+
+Cache readiness and load failures MUST continue to fall back to raw Slack IDs. Human mode MUST retain the existing plain-text cache warning. JSON mode MUST suppress that plain-text warning so an incomplete-result status on stderr remains exactly one valid JSON object rather than a mixture of text and JSON.
 
 API failures, cancellation, repeated cursors, or exhausted rate-limit retries MUST NOT emit a partial thread to stdout.
 
@@ -333,7 +337,7 @@ When the flag is set but Slack returns no metadata for a message, `metadata` MUS
 | Condition | Exit code |
 |---|---:|
 | Malformed or conflicting input | 3 |
-| Invalid filters or negative limits | 3 |
+| Invalid filters, negative limits, or a page limit of 1000 or greater | 3 |
 | Missing token or missing required scope | 2 |
 | Slack `thread_not_found` or other API rejection | 1 |
 | Rate limit without successful retry | 1 |
@@ -370,6 +374,11 @@ The following additive changes are intentional:
 
 `--all` remains accepted but is redundant. A compound positional thread identifier remains out of scope.
 
+Contributor guidance MUST document two command-boundary exceptions to the generic builtin pattern:
+
+- A semantic command whose contract gives malformed input precedence over missing authentication MUST validate that input before checking for a client.
+- Cobra's declarative flag constraints SHOULD enforce simple flag-only relationships, while positional-versus-flag mode selection and other mixed semantic constraints MUST be validated in `RunE`.
+
 ## BDD and verification
 
 Implementation MUST use BDD Red-Green-Refactor.
@@ -393,12 +402,16 @@ Required scenarios include:
 - Ascending timestamp order.
 - Every narrowing flag carried across pages.
 - `--limit` as page size.
+- `--limit=0` selecting an effective page size of 15.
+- An explicit page limit from 1 through 999 and rejection at 1000 or greater.
+- A finite remaining capacity below 15 shrinking the next request to that capacity.
 - Exact-cap and cap-plus-one behavior.
 - Unlimited `--max-results=0`.
 - Reaction sorting and formatting.
 - Empty JSON reaction arrays.
 - Metadata included only when requested.
 - Cache name resolution and fallbacks.
+- JSON incomplete-result stderr remaining one valid JSON object when the name cache is unavailable or stale.
 - Rate limiting with and without waiting.
 - Cancellation while waiting.
 - A failure on a later page with no partial stdout.
@@ -439,9 +452,11 @@ The work is complete only when:
 5. Human output uses the approved indented reaction line.
 6. JSON always contains `reactions` and exact `slack_ts`.
 7. Narrowing and pagination flags follow the defined semantics.
-8. Capped results disclose incompleteness and provide a resumable cursor.
-9. Existing input forms and output topology remain compatible.
-10. Required BDD scenarios, `make test`, and `make lint` pass.
-11. README, skill documentation, contributor guidance, design specification, and ADR agree.
+8. The default effective page size is 15, explicit page limits are below 1000, and a finite remaining capacity shrinks the next request without overfetching.
+9. Capped results disclose incompleteness and provide a resumable cursor.
+10. JSON incomplete-result diagnostics remain valid structured stderr even when the name cache is unavailable or stale.
+11. Existing input forms, `message-read`, and output topology remain compatible.
+12. Required BDD scenarios, `make test`, and `make lint` pass.
+13. README, skill documentation, global and command help, contributor guidance, design specification, and ADR agree about thread-specific zero-value behavior.
 
 *Authored By Peter O'Connor with Assistance from Claude Code (GPT-5) · 2026-07-20 · slack-cli exhaustive thread-read design*
