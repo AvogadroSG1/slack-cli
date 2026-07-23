@@ -204,6 +204,14 @@ slack-cli users --email @mycorp.com
 # Summarize a channel or thread with Claude (requires ANTHROPIC_API_KEY)
 slack-cli summarize #ops --since 24h
 slack-cli summarize #ops --json | jq -r .summary
+
+# Export history for backups or offline analysis (json, markdown, or csv)
+slack-cli export #ops --since 1w --format markdown --output ./backup
+slack-cli export all --include-files --output ./backup
+
+# Download a file by ID, permalink, or files.slack.com URL
+slack-cli download F0123456789
+slack-cli download https://myteam.slack.com/files/U01/F0123456789/report.pdf --output ./report.pdf
 ```
 
 Shared output flags on semantic commands (`summarize` supports only `--json`):
@@ -227,6 +235,10 @@ Notes:
   conversations containing sensitive data.
 - `thread-read` is deprecated in favor of `thread`; it keeps working
   unchanged. Generated commands are untouched and still emit JSON.
+- `export` and `download` write files rather than using the shared output
+  flags; `export --format` picks the file format (`json`, `markdown`,
+  `csv`) and `--include-files` saves attachments under
+  `<output>/files/<channel>/`.
 
 ### Global Flags
 
