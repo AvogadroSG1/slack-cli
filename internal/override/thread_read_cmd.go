@@ -13,8 +13,9 @@ import (
 // thread and outputs it as name-resolved plain text or JSON.
 func newThreadReadCmd(client *slack.Client) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "thread-read",
-		Short: "Read a Slack thread as name-resolved plain text or JSON",
+		Use:        "thread-read",
+		Short:      "Read a Slack thread as name-resolved plain text or JSON",
+		Deprecated: "use \"slack-cli thread\" instead",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runThreadRead(cmd, client)
 		},

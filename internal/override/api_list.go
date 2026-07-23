@@ -30,6 +30,12 @@ func RegisterBuiltins(root *cobra.Command, client *slack.Client) {
 	root.AddCommand(newThreadReadCmd(client))
 	root.AddCommand(newMessageReadCmd(client))
 	root.AddCommand(newInstallDaemonCmd())
+
+	// Semantic commands: intent-oriented, human-first output with --json for
+	// scripting. "search" and "users" double as the parents for their
+	// generated API subcommands (see dispatch.categoryParent).
+	root.AddCommand(newSearchCmd(client))
+	root.AddCommand(newThreadCmd(client))
 }
 
 // methodJSON is the JSON-serialisable representation of a registry method

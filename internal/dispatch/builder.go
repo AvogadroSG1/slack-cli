@@ -31,10 +31,7 @@ func BuildCommands(root *cobra.Command, reg []registry.MethodDef, overrides map[
 	for _, cat := range categories {
 		methods := groups[cat]
 
-		parent := &cobra.Command{
-			Use:   cat,
-			Short: fmt.Sprintf("Slack %s API methods", cat),
-		}
+		parent := categoryParent(root, cat)
 
 		for _, m := range methods {
 			if cmd, ok := overrides[m.APIMethod]; ok {
@@ -43,9 +40,27 @@ func BuildCommands(root *cobra.Command, reg []registry.MethodDef, overrides map[
 			}
 			parent.AddCommand(genericCommand(m))
 		}
-
-		root.AddCommand(parent)
 	}
+}
+
+// categoryParent returns the command that generated methods for cat should
+// attach to. When root already has a command named cat (a hand-written
+// builtin such as the semantic "search" or "users" command), the generated
+// methods become its subcommands and the builtin keeps its own RunE for
+// non-subcommand invocations. Otherwise a plain category parent is created
+// and added to root.
+func categoryParent(root *cobra.Command, cat string) *cobra.Command {
+	for _, c := range root.Commands() {
+		if c.Name() == cat {
+			return c
+		}
+	}
+	parent := &cobra.Command{
+		Use:   cat,
+		Short: fmt.Sprintf("Slack %s API methods", cat),
+	}
+	root.AddCommand(parent)
+	return parent
 }
 
 // BuildCommandsWithClient populates root with sub-commands that are fully
@@ -71,10 +86,7 @@ func BuildCommandsWithClient(
 	for _, cat := range categories {
 		methods := groups[cat]
 
-		parent := &cobra.Command{
-			Use:   cat,
-			Short: fmt.Sprintf("Slack %s API methods", cat),
-		}
+		parent := categoryParent(root, cat)
 
 		for _, m := range methods {
 			if cmd, ok := overrides[m.APIMethod]; ok {
@@ -83,8 +95,6 @@ func BuildCommandsWithClient(
 			}
 			parent.AddCommand(wiredCommand(m, client, stdout))
 		}
-
-		root.AddCommand(parent)
 	}
 }
 
