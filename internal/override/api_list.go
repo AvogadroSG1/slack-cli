@@ -36,6 +36,8 @@ func RegisterBuiltins(root *cobra.Command, client *slack.Client) {
 	// generated API subcommands (see dispatch.categoryParent).
 	root.AddCommand(newSearchCmd(client))
 	root.AddCommand(newThreadCmd(client))
+	root.AddCommand(newReadCmd(client))
+	root.AddCommand(newTailCmd(client))
 }
 
 // methodJSON is the JSON-serialisable representation of a registry method
