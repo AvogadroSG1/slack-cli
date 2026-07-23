@@ -206,7 +206,7 @@ slack-cli summarize #ops --since 24h
 slack-cli summarize #ops --json | jq -r .summary
 ```
 
-Shared output flags on semantic commands:
+Shared output flags on semantic commands (`summarize` supports only `--json`):
 
 | Flag | Description |
 |------|-------------|
@@ -222,7 +222,9 @@ Notes:
   no bulk unread API), so large workspaces take a while; progress goes to
   stderr.
 - `summarize` calls the Claude API with `ANTHROPIC_API_KEY` (model
-  configurable via `--model`, default `claude-opus-4-8`).
+  configurable via `--model`, default `claude-opus-4-8`). The collected
+  transcript is sent to Anthropic's API — keep that in mind for
+  conversations containing sensitive data.
 - `thread-read` is deprecated in favor of `thread`; it keeps working
   unchanged. Generated commands are untouched and still emit JSON.
 

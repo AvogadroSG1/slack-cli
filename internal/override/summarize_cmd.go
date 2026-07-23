@@ -71,7 +71,11 @@ func newSummarizeCmd(client *slack.Client) *cobra.Command {
 		Long: `Collect recent messages from a channel (or a full thread from a
 permalink) and summarize the key decisions, action items, and discussion
 points using the Claude API. Requires ANTHROPIC_API_KEY in addition to
-SLACK_TOKEN.`,
+SLACK_TOKEN.
+
+Note: the collected message transcript is sent to Anthropic's Claude API
+(a third-party service) to produce the summary — consider that before
+summarizing conversations containing sensitive data.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if client == nil {
@@ -148,15 +152,19 @@ func runSummarize(cmd *cobra.Command, client readClient, llm summarizer, target 
 	}
 
 	if asJSON {
-		return renderOutput(cmd.OutOrStdout(), outputOpts{JSON: true}, summarizeResult{
+		err = renderOutput(cmd.OutOrStdout(), outputOpts{JSON: true}, summarizeResult{
 			Summary:      summary,
 			Model:        model,
 			MessageCount: len(msgs),
 			Channel:      channelName,
 		}, nil)
+	} else {
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), strings.TrimRight(summary, "\n"))
 	}
-	_, err = fmt.Fprintln(cmd.OutOrStdout(), strings.TrimRight(summary, "\n"))
-	return err
+	if err != nil {
+		return formatAndExit(cmd, err, exitcode.NetError)
+	}
+	return nil
 }
 
 // buildTranscript renders messages as mrkdwn-stripped "Name [time]: text"

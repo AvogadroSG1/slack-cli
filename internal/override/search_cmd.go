@@ -90,6 +90,9 @@ func runSearch(cmd *cobra.Command, client searchClient, args []string) error {
 		}
 		query += " before:" + date
 	}
+	if limit <= 0 {
+		return formatAndExit(cmd, fmt.Errorf("--limit must be positive"), exitcode.InputError)
+	}
 	if searchType != "messages" && searchType != "files" {
 		return formatAndExit(cmd, fmt.Errorf("invalid --type %q (valid: messages, files)", searchType), exitcode.InputError)
 	}

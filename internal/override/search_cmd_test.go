@@ -162,6 +162,8 @@ func TestSearchInvalidFlags(t *testing.T) {
 		{"q", "--type", "nope"},
 		{"q", "--sort", "nope"},
 		{"q", "--after", "garbage"},
+		{"q", "--limit", "0"},
+		{"q", "--limit", "-5"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			if _, _, err := execSearch(t, f, args...); err == nil {
