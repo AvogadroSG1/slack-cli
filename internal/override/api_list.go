@@ -38,6 +38,10 @@ func RegisterBuiltins(root *cobra.Command, client *slack.Client) {
 	root.AddCommand(newThreadCmd(client))
 	root.AddCommand(newReadCmd(client))
 	root.AddCommand(newTailCmd(client))
+	root.AddCommand(newUnreadCmd(client))
+	root.AddCommand(newInspectCmd(client))
+	root.AddCommand(newChannelsCmd(client))
+	root.AddCommand(newUsersCmd(client))
 }
 
 // methodJSON is the JSON-serialisable representation of a registry method
