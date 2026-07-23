@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"io"
 	"strings"
 	"testing"
 
@@ -289,5 +290,55 @@ func TestBuildCommandsEmptyRegistry(t *testing.T) {
 
 	if len(root.Commands()) != 0 {
 		t.Errorf("expected no sub-commands for empty registry, got %d", len(root.Commands()))
+	}
+}
+
+func TestBuildCommandsMergesIntoExistingRootCommand(t *testing.T) {
+	root := &cobra.Command{Use: "slack"}
+
+	ran := false
+	semantic := &cobra.Command{
+		Use:   "users [flags]",
+		Short: "Semantic user listing",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ran = true
+			return nil
+		},
+	}
+	root.AddCommand(semantic)
+
+	BuildCommandsWithClient(root, testRegistry(), nil, nil, io.Discard)
+
+	// No duplicate "users" parent was created.
+	var usersCmds []*cobra.Command
+	for _, c := range root.Commands() {
+		if c.Name() == "users" {
+			usersCmds = append(usersCmds, c)
+		}
+	}
+	if len(usersCmds) != 1 {
+		t.Fatalf("got %d root commands named users, want 1", len(usersCmds))
+	}
+	if usersCmds[0] != semantic {
+		t.Error("generated methods did not merge into the pre-registered command")
+	}
+
+	// Generated children attached to the semantic command.
+	var children []string
+	for _, c := range semantic.Commands() {
+		children = append(children, c.Name())
+	}
+	want := []string{"info", "list"}
+	if diff := cmp.Diff(want, children); diff != "" {
+		t.Errorf("children mismatch (-want +got):\n%s", diff)
+	}
+
+	// The semantic RunE still runs for bare invocations.
+	root.SetArgs([]string{"users"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("bare users invocation: %v", err)
+	}
+	if !ran {
+		t.Error("semantic RunE did not run")
 	}
 }
