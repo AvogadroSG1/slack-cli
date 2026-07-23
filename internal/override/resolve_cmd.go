@@ -120,23 +120,27 @@ func newResolveUsergroupCmd(client *slack.Client) *cobra.Command {
 	return cmd
 }
 
-// warnIfCacheNotReady runs local-only migrations and prints a warning
-// to stderr if the cache is stale or empty. It never blocks or errors.
-func warnIfCacheNotReady(cmd *cobra.Command) {
-	// Run local-only migrations (pass nil fetcher to guarantee no API calls).
+// prepareCache runs local-only migrations and optionally warns when the cache
+// is stale or empty. It never blocks on Slack or returns an error.
+func prepareCache(cmd *cobra.Command, warnings bool) {
 	_, err := cache.EnsureReady(cmd.Context(), nil)
 	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(),
-			"Warning: cache migration failed: %v\n", err)
+		if warnings {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: cache migration failed: %v\n", err)
+		}
 		return
 	}
 
-	// IsStale returns true on error, so discarding err still produces a correct warning.
 	stale, _ := cache.IsStale()
-	if stale {
-		fmt.Fprintf(cmd.ErrOrStderr(),
-			"Warning: cache not warmed. Run \"slack-cli cache warm\" for faster lookups.\n")
+	if stale && warnings {
+		fmt.Fprintln(cmd.ErrOrStderr(),
+			"Warning: cache not warmed. Run \"slack-cli cache warm\" for faster lookups.")
 	}
+}
+
+// warnIfCacheNotReady preserves warning behavior for existing human-oriented commands.
+func warnIfCacheNotReady(cmd *cobra.Command) {
+	prepareCache(cmd, true)
 }
 
 // formatAndExit writes a JSON error to stderr and returns an exit error.

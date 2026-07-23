@@ -282,10 +282,8 @@ func extractParams(sig *types.Signature, slackPkg *types.Package) ([]paramInfo, 
 		}
 
 		// Plain positional parameter.
-		flagName := pName
-		if override, ok := paramNameOverrides[pName]; ok {
-			flagName = override
-		} else {
+		flagName, ok := paramNameOverrides[pName]
+		if !ok {
 			flagName = camelToKebab(pName)
 		}
 		if !seen[flagName] {

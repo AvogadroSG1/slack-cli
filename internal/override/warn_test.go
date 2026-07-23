@@ -85,6 +85,20 @@ func TestWarnIfCacheNotReady(t *testing.T) {
 	}
 }
 
+func TestPrepareCacheCanSuppressWarnings(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SLACK_CLI_CACHE_DIR", dir)
+	cmd := &cobra.Command{Use: "test"}
+	var stderr bytes.Buffer
+	cmd.SetErr(&stderr)
+
+	prepareCache(cmd, false)
+
+	if stderr.Len() != 0 {
+		t.Errorf("stderr = %q, want empty", stderr.String())
+	}
+}
+
 // writeMeta writes a CacheMeta JSON file to dir.
 func writeMeta(t *testing.T, dir string, m cache.CacheMeta) {
 	t.Helper()

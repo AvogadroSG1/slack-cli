@@ -2,60 +2,363 @@ package override
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/poconnor/slack-cli/internal/dispatch"
+	"github.com/poconnor/slack-cli/internal/exitcode"
+	"github.com/slack-go/slack"
 	"github.com/spf13/cobra"
 )
 
-// executeThreadRead runs "thread-read" with the given args using a nil client
-// and returns stdout, stderr, and the error.
-func executeThreadRead(t *testing.T, args ...string) (stdout, stderr string, err error) {
+func newThreadReadTestRoot(dependencies threadReadDependencies) *cobra.Command {
+	root := &cobra.Command{Use: "slack-cli", SilenceUsage: true, SilenceErrors: true}
+	flags := root.PersistentFlags()
+	flags.Bool("pretty", false, "")
+	flags.Bool("all", false, "")
+	flags.Int("limit", 0, "")
+	flags.String("cursor", "", "")
+	flags.Bool("wait-on-rate-limit", false, "")
+	flags.Int("max-results", 10000, "")
+	root.AddCommand(newThreadReadCmdWithDependencies(dependencies))
+	return root
+}
+
+func executeThreadRead(
+	t *testing.T,
+	dependencies threadReadDependencies,
+	args ...string,
+) (stdout, stderr string, err error) {
 	t.Helper()
-	root := &cobra.Command{Use: "slack-cli"}
-	root.AddCommand(newThreadReadCmd(nil))
-
-	var outBuf, errBuf bytes.Buffer
-	root.SetOut(&outBuf)
-	root.SetErr(&errBuf)
+	root := newThreadReadTestRoot(dependencies)
+	var out, errOut bytes.Buffer
+	root.SetOut(&out)
+	root.SetErr(&errOut)
 	root.SetArgs(append([]string{"thread-read"}, args...))
-
 	err = root.Execute()
-	return outBuf.String(), errBuf.String(), err
+	return out.String(), errOut.String(), err
 }
 
-func TestThreadReadNilClientReturnsAuthError(t *testing.T) {
-	_, stderr, err := executeThreadRead(t, "--url", "https://x.slack.com/archives/C0AFM69EB1B/p1775827095264229")
-	if err == nil {
-		t.Fatal("expected error for nil client")
-	}
-	if !strings.Contains(stderr, "SLACK_TOKEN") {
-		t.Errorf("stderr missing SLACK_TOKEN: %s", stderr)
-	}
-}
-
-func TestThreadReadBadURLReturnsInputError(t *testing.T) {
-	// A nil client check happens first, so we can't reach URL parsing with nil.
-	// Test URL parsing independently via parseSlackURL (white-box).
-	_, _, err := parseSlackURL("https://x.slack.com/nope")
-	if err == nil {
-		t.Fatal("expected error for bad URL")
-	}
-	if !strings.Contains(err.Error(), "invalid slack url") {
-		t.Errorf("error = %q, want 'invalid slack url'", err.Error())
+func successfulThreadDependencies(client threadClient) threadReadDependencies {
+	return threadReadDependencies{
+		client:       client,
+		prepareCache: func(*cobra.Command, bool) {},
+		loadIDToNameMap: func() (map[string]string, error) {
+			return map[string]string{"U09PETER01": "Peter O'Connor"}, nil
+		},
+		wait: noWait,
 	}
 }
 
-func TestThreadReadFlagContract(t *testing.T) {
-	// --channel without --ts should fail at Cobra flag validation.
-	root := &cobra.Command{Use: "slack-cli"}
-	root.AddCommand(newThreadReadCmd(nil))
-	root.SetArgs([]string{"thread-read", "--channel", "C01"})
+func TestThreadReadPreferredAndLegacyInputs(t *testing.T) {
+	permalink := "https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229"
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "positional", args: []string{permalink}},
+		{name: "url", args: []string{"--url", permalink}},
+		{name: "flags", args: []string{"--channel", "C09M260TY7Q", "--ts", "1784131538.270229"}},
+		{name: "redundant all with human pretty", args: []string{permalink, "--all", "--pretty"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeThreadClient{pages: []fakeThreadPage{{messages: []slack.Message{{
+				Msg: slack.Msg{
+					User: "U09PETER01", Timestamp: "1784131538.270229",
+					Text:      "Deployment complete",
+					Reactions: []slack.ItemReaction{{Name: "eyes", Count: 2, Users: []string{"U01"}}},
+				},
+			}}}}}
+			stdout, stderr, err := executeThreadRead(t, successfulThreadDependencies(client), tt.args...)
+			if err != nil {
+				t.Fatalf("error = %v, stderr = %s", err, stderr)
+			}
+			if stderr != "" {
+				t.Errorf("stderr = %q, want empty", stderr)
+			}
+			if !strings.Contains(stdout, "Peter O'Connor") ||
+				!strings.Contains(stdout, "  Reactions: :eyes: 2") {
+				t.Errorf("stdout = %q", stdout)
+			}
+			if len(client.calls) != 1 ||
+				client.calls[0].ChannelID != "C09M260TY7Q" ||
+				client.calls[0].Timestamp != "1784131538.270229" {
+				t.Errorf("Slack calls = %#v", client.calls)
+			}
+		})
+	}
+}
 
-	var errBuf bytes.Buffer
-	root.SetErr(&errBuf)
+func TestThreadReadReplyPermalinkAnchorsAtParent(t *testing.T) {
+	client := &fakeThreadClient{pages: []fakeThreadPage{{
+		messages: []slack.Message{slackMessage("1784131538.270229")},
+	}}}
+	permalink := "https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131630101010?thread_ts=1784131538.270229&cid=C09M260TY7Q"
+	_, stderr, err := executeThreadRead(t, successfulThreadDependencies(client), permalink)
+	if err != nil {
+		t.Fatalf("error = %v, stderr = %s", err, stderr)
+	}
+	if got := client.calls[0].Timestamp; got != "1784131538.270229" {
+		t.Errorf("thread timestamp = %q, want parent", got)
+	}
+}
+
+func TestThreadReadInputErrorsUseJSONEnvelopeBeforeAuth(t *testing.T) {
+	permalink := "https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229"
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "no mode"},
+		{name: "too many arguments", args: []string{permalink, permalink}},
+		{name: "mode conflict", args: []string{permalink, "--url", permalink}},
+		{name: "missing timestamp", args: []string{"--channel", "C09M260TY7Q"}},
+		{name: "negative limit", args: []string{permalink, "--limit", "-1"}},
+		{name: "non-integer limit", args: []string{permalink, "--limit", "many"}},
+		{name: "negative maximum", args: []string{permalink, "--max-results", "-1"}},
+		{
+			name: "reversed range",
+			args: []string{
+				permalink, "--oldest", "1784131700.000001",
+				"--latest", "1784131538.270229",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout, stderr, err := executeThreadRead(t, threadReadDependencies{}, tt.args...)
+			if dispatch.ExitCode(err) != exitcode.InputError {
+				t.Fatalf("exit code = %d, want %d", dispatch.ExitCode(err), exitcode.InputError)
+			}
+			if stdout != "" {
+				t.Errorf("stdout = %q, want empty", stdout)
+			}
+			var envelope struct {
+				OK       bool   `json:"ok"`
+				Error    string `json:"error"`
+				ExitCode int    `json:"exit_code"`
+			}
+			if json.Unmarshal([]byte(stderr), &envelope) != nil ||
+				envelope.OK || envelope.ExitCode != exitcode.InputError {
+				t.Errorf("stderr = %q, want input-error JSON envelope", stderr)
+			}
+		})
+	}
+}
+
+func TestThreadReadValidInputWithoutClientReturnsAuthError(t *testing.T) {
+	permalink := "https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229"
+	stdout, stderr, err := executeThreadRead(t, threadReadDependencies{}, permalink)
+	if stdout != "" ||
+		dispatch.ExitCode(err) != exitcode.AuthError ||
+		!strings.Contains(stderr, "SLACK_TOKEN") {
+		t.Fatalf("stdout/stderr/code = %q/%q/%d", stdout, stderr, dispatch.ExitCode(err))
+	}
+}
+
+func TestThreadReadJSONTakesPrecedenceAndReportsIncompleteResult(t *testing.T) {
+	client := &fakeThreadClient{pages: []fakeThreadPage{{
+		messages:   []slack.Message{slackMessage("1784131538.270229")},
+		nextCursor: "resume-cursor",
+	}}}
+	stdout, stderr, err := executeThreadRead(
+		t,
+		successfulThreadDependencies(client),
+		"https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229",
+		"--json", "--pretty", "--max-results", "1",
+	)
+	if err != nil {
+		t.Fatalf("error = %v", err)
+	}
+	var messages []map[string]any
+	if err := json.Unmarshal([]byte(stdout), &messages); err != nil || len(messages) != 1 {
+		t.Fatalf("stdout = %q: %v", stdout, err)
+	}
+	if _, present := messages[0]["slack_ts"]; !present {
+		t.Errorf("stdout lacks slack_ts: %s", stdout)
+	}
+	var status threadIncompleteStatus
+	if err := json.Unmarshal([]byte(stderr), &status); err != nil {
+		t.Fatalf("stderr = %q: %v", stderr, err)
+	}
+	if status.Complete || status.Reason != "max_results" || status.NextCursor != "resume-cursor" {
+		t.Errorf("status = %#v", status)
+	}
+}
+
+func TestThreadReadJSONSuppressesPlaintextCacheWarning(t *testing.T) {
+	client := &fakeThreadClient{pages: []fakeThreadPage{{
+		messages:   []slack.Message{slackMessage("1784131538.270229")},
+		nextCursor: "resume-cursor",
+	}}}
+	dependencies := successfulThreadDependencies(client)
+	preparations := 0
+	dependencies.prepareCache = func(cmd *cobra.Command, warnings bool) {
+		preparations++
+		if warnings {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Warning: cache not warmed")
+		}
+	}
+	stdout, stderr, err := executeThreadRead(
+		t,
+		dependencies,
+		"https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229",
+		"--json", "--max-results", "1",
+	)
+	if err != nil {
+		t.Fatalf("error = %v", err)
+	}
+	if preparations != 1 {
+		t.Errorf("cache preparations = %d, want 1", preparations)
+	}
+	var messages []map[string]any
+	if err := json.Unmarshal([]byte(stdout), &messages); err != nil {
+		t.Fatalf("stdout = %q: %v", stdout, err)
+	}
+	var status threadIncompleteStatus
+	if err := json.Unmarshal([]byte(stderr), &status); err != nil {
+		t.Fatalf("stderr = %q, want one JSON status object: %v", stderr, err)
+	}
+	if status.NextCursor != "resume-cursor" {
+		t.Errorf("next cursor = %q, want resume-cursor", status.NextCursor)
+	}
+}
+
+func TestThreadReadHumanReportsIncompleteResult(t *testing.T) {
+	client := &fakeThreadClient{pages: []fakeThreadPage{{
+		messages:   []slack.Message{slackMessage("1784131538.270229")},
+		nextCursor: "resume-cursor",
+	}}}
+	_, stderr, err := executeThreadRead(
+		t,
+		successfulThreadDependencies(client),
+		"https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229",
+		"--max-results", "1",
+	)
+	if err != nil {
+		t.Fatalf("error = %v", err)
+	}
+	want := "Warning: result limited by --max-results; resume with --cursor resume-cursor\n"
+	if stderr != want {
+		t.Errorf("stderr = %q, want %q", stderr, want)
+	}
+}
+
+func TestThreadReadFailuresNeverWritePartialStdout(t *testing.T) {
+	tests := []struct {
+		name     string
+		pages    []fakeThreadPage
+		wantCode int
+	}{
+		{
+			name: "later API error",
+			pages: []fakeThreadPage{
+				{messages: []slack.Message{slackMessage("1784131538.270229")}, nextCursor: "next"},
+				{err: slack.SlackErrorResponse{Err: "thread_not_found"}},
+			},
+			wantCode: exitcode.APIError,
+		},
+		{
+			name: "repeated cursor",
+			pages: []fakeThreadPage{
+				{messages: []slack.Message{slackMessage("1784131538.270229")}, nextCursor: "repeat"},
+				{messages: []slack.Message{slackMessage("1784131630.101010")}, nextCursor: "repeat"},
+			},
+			wantCode: exitcode.APIError,
+		},
+		{
+			name:     "context cancellation",
+			pages:    []fakeThreadPage{{err: context.Canceled}},
+			wantCode: exitcode.NetError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeThreadClient{pages: tt.pages}
+			stdout, stderr, err := executeThreadRead(
+				t,
+				successfulThreadDependencies(client),
+				"https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229",
+			)
+			if stdout != "" || dispatch.ExitCode(err) != tt.wantCode {
+				t.Fatalf("stdout/code = %q/%d, want empty/%d; stderr = %s", stdout, dispatch.ExitCode(err), tt.wantCode, stderr)
+			}
+			if !strings.Contains(stderr, "\"ok\": false") {
+				t.Errorf("stderr = %q, want error envelope", stderr)
+			}
+		})
+	}
+}
+
+func TestThreadReadEmptyResponsePreservesInputExitCode(t *testing.T) {
+	client := &fakeThreadClient{pages: []fakeThreadPage{{}}}
+	stdout, stderr, err := executeThreadRead(
+		t,
+		successfulThreadDependencies(client),
+		"https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229",
+	)
+	if stdout != "" ||
+		dispatch.ExitCode(err) != exitcode.InputError ||
+		!strings.Contains(stderr, "no thread found") {
+		t.Fatalf("stdout/stderr/code = %q/%q/%d", stdout, stderr, dispatch.ExitCode(err))
+	}
+}
+
+func TestThreadReadLoadsCacheOnce(t *testing.T) {
+	client := &fakeThreadClient{pages: []fakeThreadPage{
+		{messages: []slack.Message{slackMessage("1784131538.270229")}, nextCursor: "next"},
+		{messages: []slack.Message{slackMessage("1784131630.101010")}},
+	}}
+	dependencies := successfulThreadDependencies(client)
+	loads := 0
+	readinessChecks := 0
+	var warningModes []bool
+	dependencies.prepareCache = func(_ *cobra.Command, warnings bool) {
+		readinessChecks++
+		warningModes = append(warningModes, warnings)
+	}
+	dependencies.loadIDToNameMap = func() (map[string]string, error) {
+		loads++
+		return nil, errors.New("cache unavailable")
+	}
+	_, stderr, err := executeThreadRead(
+		t,
+		dependencies,
+		"https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229",
+	)
+	if err != nil {
+		t.Fatalf("error = %v, stderr = %s", err, stderr)
+	}
+	if loads != 1 || readinessChecks != 1 {
+		t.Errorf("cache loads/readiness checks = %d/%d, want 1/1", loads, readinessChecks)
+	}
+	if len(warningModes) != 1 || !warningModes[0] {
+		t.Errorf("cache warning modes = %v, want [true]", warningModes)
+	}
+}
+
+func TestThreadReadOutputFailureUsesNetworkExitCode(t *testing.T) {
+	client := &fakeThreadClient{pages: []fakeThreadPage{{
+		messages: []slack.Message{slackMessage("1784131538.270229")},
+	}}}
+	root := newThreadReadTestRoot(successfulThreadDependencies(client))
+	var stderr bytes.Buffer
+	root.SetOut(&errWriter{})
+	root.SetErr(&stderr)
+	root.SetArgs([]string{
+		"thread-read",
+		"https://stackexchange.slack.com/archives/C09M260TY7Q/p1784131538270229",
+	})
 	err := root.Execute()
-	if err == nil {
-		t.Fatal("expected error: --channel without --ts")
+	if dispatch.ExitCode(err) != exitcode.NetError {
+		t.Fatalf("exit code = %d, want %d", dispatch.ExitCode(err), exitcode.NetError)
+	}
+	if !strings.Contains(stderr.String(), "write failed") {
+		t.Errorf("stderr = %q", stderr.String())
 	}
 }
