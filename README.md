@@ -21,6 +21,7 @@ slack-cli conversations members --channel C01ABCDEF --all
 - [How It Works](#how-it-works)
 - [Getting Started](#getting-started)
 - [Usage](#usage)
+  - [Semantic Commands](#semantic-commands)
 - [Architecture](#architecture)
 - [Development](#development)
 
@@ -167,6 +168,63 @@ slack-cli search messages --query "deploy failed"
 # Pipe JSON output to jq
 slack-cli conversations list --limit 10 | jq '.[].name'
 ```
+
+### Semantic Commands
+
+Beyond the generated API commands, slack-cli ships intent-oriented commands
+for common workflows. They accept names as well as IDs (`#channel`, `@user`,
+or raw `C…`/`U…` IDs — run `slack-cli cache warm` once so names resolve),
+print human-readable text by default, and support `--json` for scripting.
+
+```bash
+# Search messages with Slack's query syntax (requires a user token, xoxp-…)
+slack-cli search "deploy failed in:#ops" --after 3d --limit 10
+
+# Read a full thread from a permalink (or: thread #channel <ts>)
+slack-cli thread https://myteam.slack.com/archives/C01ABCDEF/p1234567890123456
+
+# Read recent messages from a channel or DM
+slack-cli read #ops --since 2h
+slack-cli read @alice --limit 20 --include-threads
+
+# Stream new messages live (like tail -f; Ctrl-C to stop)
+slack-cli tail #deploys --interval 5s
+
+# List conversations with unread activity (requires a user token)
+slack-cli unread --min 2
+
+# Show metadata for any entity: channel, user, or usergroup
+slack-cli inspect #ops
+slack-cli inspect @alice
+
+# Filtered listings
+slack-cli channels --private --match dev
+slack-cli users --email @mycorp.com
+
+# Summarize a channel or thread with Claude (requires ANTHROPIC_API_KEY)
+slack-cli summarize #ops --since 24h
+slack-cli summarize #ops --json | jq -r .summary
+```
+
+Shared output flags on semantic commands:
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Structured JSON for piping into `jq` (for `tail`: one JSON object per line) |
+| `--plain` | Strip Slack markup and `:emoji:` from message text |
+| `--template` | Render through a Go `text/template`, e.g. `--template '{{range .}}{{.User}}: {{.Text}}{{"\n"}}{{end}}'` |
+
+Notes:
+
+- `search` and `unread` need a **user token** (`xoxp-…`); Slack rejects bot
+  tokens for the search API and only reports unread counts to user tokens.
+- `unread` makes one `conversations.info` call per conversation (Slack has
+  no bulk unread API), so large workspaces take a while; progress goes to
+  stderr.
+- `summarize` calls the Claude API with `ANTHROPIC_API_KEY` (model
+  configurable via `--model`, default `claude-opus-4-8`).
+- `thread-read` is deprecated in favor of `thread`; it keeps working
+  unchanged. Generated commands are untouched and still emit JSON.
 
 ### Global Flags
 
