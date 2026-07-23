@@ -27,7 +27,7 @@ internal/registry/    MethodDef/ParamDef types + generated.go (73 methods, DO NO
 internal/dispatch/    Command builder, executor, pagination, output formatting
 internal/dispatch/impl_*.go   Per-category dispatch funcs (chat, users, files, conversations, …)
 internal/override/    Hand-written commands: generated overrides + top-level builtins
-internal/cache/       File-based name/ID cache (channels, people, usergroups, id-to-name)
+internal/cache/       File-based name/ID cache + warming (channels, people, usergroups, id-to-name)
 internal/validate/    Input validation (channel IDs, user IDs, timestamps, JSON)
 internal/exitcode/    Exit code classification from Slack API errors
 docs/superpowers/     Design specs and implementation plans (history/rationale, dated)
@@ -54,11 +54,18 @@ only if `SLACK_TOKEN` is set (nil client otherwise) → `override.RegisterBuilti
     specific API method (`Overrides` map, keyed by e.g. `"chat.postMessage"`).
   - `RegisterBuiltins(root, client)` — adds top-level commands not derived from
     the registry: `api list`, `cache` (`warm`/`info`/`clear`), `resolve`
-    (`channel`/`user`/`usergroup`), `thread-read`, `message-read`.
+    (`channel`/`user`/`usergroup`), `thread-read`, `message-read`, `install-daemon`.
 - **Cache**: file-based store in `~/.slack-cli/` (`DefaultDir`), format
   `CurrentVersion = 3`; staleness ~24h, refreshed explicitly via `cache warm`.
-  `id-to-name.json` is a reverse index used by `thread-read`/`message-read` to
-  resolve user IDs → display names. Migration logic in `internal/cache/migrate.go`.
+  Separate per-entity files (`channels.json`, `people.json`, `usergroups.json`,
+  `id-to-name.json`, `cache-meta.json`) guarded by a single `cache.lock` for
+  atomic reads/writes. `id-to-name.json` is a reverse index used by
+  `thread-read`/`message-read` to resolve user IDs → display names. Migration
+  logic in `internal/cache/migrate.go`.
+- **Cache warming**: `cache.Warm` (`internal/cache/warm.go`) fetches all
+  channels/users/usergroups with rate-limit retries; exposed as `cache warm`.
+  `install-daemon` installs a macOS launchd agent that runs `cache warm` hourly
+  (macOS only).
 - **Output**: JSON by default (compact); `--pretty` indents and renders top-level
   maps as aligned key/value columns via `text/tabwriter`. Errors emit a JSON
   object with `ok`, `error`, `exit_code`.
@@ -73,14 +80,14 @@ Persistent flags on the root command (apply to all subcommands):
 
 | Flag | Default | Purpose |
 |------|---------|---------|
-| `--pretty` | false | Pretty-print JSON output |
-| `--all` | false | Auto-fetch all pages of results |
-| `--limit` | 0 | Max items per API request (0 = API default) |
+| `--pretty` | false | Human-readable output when available; otherwise pretty-print JSON |
+| `--all` | false | Auto-fetch all pages of results (thread-read is already exhaustive) |
+| `--limit` | 0 | Max items per API request (thread-read: 0 uses 15; else API default) |
 | `--cursor` | "" | Pagination cursor to resume a request |
 | `--timeout` | 30s | HTTP timeout for API calls |
 | `--debug` | false | Debug logging to stderr |
 | `--wait-on-rate-limit` | false | Wait + retry on rate limit instead of failing |
-| `--max-results` | 10000 | Cap on total results when using `--all` |
+| `--max-results` | 10000 | Cap on total results during exhaustive retrieval (thread-read: 0 = unlimited) |
 
 ## Testing
 
