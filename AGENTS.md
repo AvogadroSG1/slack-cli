@@ -1,6 +1,6 @@
 # slack-cli
 
-CLI for the Slack Web API. 73 methods auto-generated from SDK introspection, plus hand-written semantic commands (search, thread, read, tail, unread, inspect, channels, users, summarize). Built with Go + Cobra.
+CLI for the Slack Web API. 73 methods auto-generated from SDK introspection, plus hand-written semantic commands (search, thread, read, tail, unread, inspect, channels, users, summarize, export, download). Built with Go + Cobra.
 
 ## Commands
 
@@ -32,7 +32,7 @@ internal/exitcode/    Exit code classification from Slack API errors
 - **Dispatch pipeline**: registry → builder → executor → output (flag extraction, pagination, JSON formatting)
 - **Override mechanism**: two kinds of hand-written commands in `internal/override/`:
   - `override.Register(apiMethod, cmd)` — replaces a generated command for a specific API method
-  - `RegisterBuiltins(root, client)` — adds top-level commands (`cache`, `resolve`, `thread-read`, `message-read`, `api`) and the semantic commands (`search`, `thread`, `read`, `tail`, `unread`, `inspect`, `channels`, `users`, `summarize`)
+  - `RegisterBuiltins(root, client)` — adds top-level commands (`cache`, `resolve`, `thread-read`, `message-read`, `api`) and the semantic commands (`search`, `thread`, `read`, `tail`, `unread`, `inspect`, `channels`, `users`, `summarize`, `export`, `download`)
 - **Category merge**: the dispatch builder attaches generated method subcommands to a pre-registered root command of the same name (`dispatch.categoryParent`) — this is how the semantic `search`/`users` commands coexist with the generated `search.*`/`users.*` children
 - **Output convention**: generated commands emit JSON (machine-first, unchanged); semantic commands are human-first — readable text by default with shared `--json`/`--plain`/`--template` flags (`addOutputFlags`/`renderOutput` in `internal/override/output.go`). Semantic commands register a *local* `--limit` flag that shadows the global persistent one
 - **Semantic command helpers** in `internal/override/`: `resolveChannelArg`/`resolveUserArg`/`resolveTarget` (name-or-ID → ID via cache), `parseTimeSpec` (2h/3d/1w/dates → Slack ts), `fetchChannelMessages`/`fetchThreadMessages` (cursor pagination behind narrow fetcher interfaces for testability), `stripMrkdwn`
