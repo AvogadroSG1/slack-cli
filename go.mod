@@ -6,6 +6,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/slack-go/slack v0.21.1
 	github.com/spf13/cobra v1.10.2
+	golang.org/x/tools v0.44.0
 )
 
 require (
@@ -14,5 +15,4 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/tools v0.44.0 // indirect
 )
